@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: aneslog
+    runtime: docker
+    repo: https://github.com/SachaRozencwajg/AnesLog
+    plan: free
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
