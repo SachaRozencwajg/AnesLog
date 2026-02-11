@@ -16,63 +16,6 @@ from app.utils.email import send_email
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
-@router.post("/equipe/invite")
-def invite_resident(
-    request: Request,
-    background_tasks: BackgroundTasks,
-    email_list: str = Form(...),
-    user: User = Depends(require_senior),
-    db: Session = Depends(get_db),
-):
-    """Send invitation emails to residents."""
-    emails = [e.strip() for e in email_list.split(",") if e.strip()]
-    if not emails:
-        return RedirectResponse("/equipe", status_code=303)
-        
-    base_url = str(request.base_url).rstrip("/")
-    subject = f"{user.full_name} vous invite à rejoindre son équipe sur AnesLog"
-    
-    for email in emails:
-        # Determine invite link with token if team exists
-        if user.team_id:
-            token = create_invitation_token(email, user.team_id)
-            invite_link = f"{base_url}/inscription?token={token}"
-        else:
-            invite_link = f"{base_url}/inscription"
-
-        # 1. Check if user already exists
-        existing_user = db.query(User).filter(User.email == email).first()
-        if existing_user:
-            pass 
-        else:
-            # 2. Create Invitation record
-            existing_invite = db.query(Invitation).filter(
-                Invitation.email == email,
-                Invitation.team_id == user.team_id
-            ).first()
-            
-            if not existing_invite:
-                new_invite = Invitation(email=email, team_id=user.team_id)
-                db.add(new_invite)
-            
-        body = f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; color: #333;">
-            <p>Bonjour,</p>
-            <p>Le Dr. {user.full_name} vous invite à rejoindre son équipe sur AnesLog.</p>
-            <p>Cliquez sur le lien ci-dessous pour créer votre compte et rejoindre l'équipe automatiquement :</p>
-            <p style="text-align: center; margin: 20px 0;">
-                <a href="{invite_link}" style="background-color: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Rejoindre l'équipe</a>
-            </p>
-            <p style="font-size: 12px; color: #666;">Lien : {invite_link}</p>
-        </body>
-        </html>
-        """
-        background_tasks.add_task(send_email, subject, [email], body)
-from app.utils.email import send_email
-
-router = APIRouter()
-templates = Jinja2Templates(directory="app/templates")
 
 
 @router.get("/equipe")
@@ -84,7 +27,7 @@ def team_overview(
 ):
     """
     Team overview for seniors: table listing all residents with summary stats.
-    Only shows residents in the same team.
+    Includes group analytics (Means, Totals).
     """
     if not user.team_id:
         return templates.TemplateResponse(
@@ -118,17 +61,33 @@ def team_overview(
         Invitation.status == InvitationStatus.pending
     ).all()
 
+    # Helper: Fetch Category IDs for analysis
+    cat_names = ["Chirurgie Cardiaque", "Chirurgie Thoracique", "Chirurgie Vasculaire"]
+    cat_ids = {}
+    for name in cat_names:
+        c = db.query(Category).filter(Category.name == name).first()
+        if c: cat_ids[name] = c.id
+
     # Build summary stats for APPROVED residents
     resident_stats = []
+    
+    group_totals = {
+        "cases": 0,
+        "cardio": 0,
+        "thoracic": 0,
+        "vascular": 0,
+        "autonomy_sum": 0
+    }
+
     for resident in residents:
         total_logs = db.query(func.count(ProcedureLog.id)).filter(
             ProcedureLog.user_id == resident.id
-        ).scalar()
+        ).scalar() or 0
 
         autonomous_count = db.query(func.count(ProcedureLog.id)).filter(
             ProcedureLog.user_id == resident.id,
             ProcedureLog.autonomy_level == AutonomyLevel.autonomous,
-        ).scalar()
+        ).scalar() or 0
 
         last_log = (
             db.query(ProcedureLog)
@@ -136,13 +95,50 @@ def team_overview(
             .order_by(ProcedureLog.date.desc())
             .first()
         )
+        
+        # Category specific counts
+        def get_cat_count(c_name):
+            cid = cat_ids.get(c_name)
+            if not cid: return 0
+            return db.query(func.count(ProcedureLog.id))\
+                .join(Procedure)\
+                .filter(ProcedureLog.user_id == resident.id, Procedure.category_id == cid)\
+                .scalar() or 0
+
+        c_cardio = get_cat_count("Chirurgie Cardiaque")
+        c_thoracic = get_cat_count("Chirurgie Thoracique")
+        c_vascular = get_cat_count("Chirurgie Vasculaire")
+        
+        # Percentage of autonomy
+        autonomy_pct = int(round((autonomous_count / total_logs) * 100)) if total_logs > 0 else 0
+        
+        # Accumulate
+        group_totals["cases"] += total_logs
+        group_totals["cardio"] += c_cardio
+        group_totals["thoracic"] += c_thoracic
+        group_totals["vascular"] += c_vascular
+        group_totals["autonomy_sum"] += autonomy_pct
 
         resident_stats.append({
             "user": resident,
             "total_logs": total_logs,
-            "autonomous_count": autonomous_count,
+            "cardio_count": c_cardio,
+            "thoracic_count": c_thoracic,
+            "vascular_count": c_vascular,
+            "autonomy_pct": autonomy_pct,
             "last_log_date": last_log.date if last_log else None,
         })
+
+    # Calculate Averages (avoid division by zero)
+    num = len(residents) if residents else 1
+    averages = {
+        "cases": int(round(group_totals["cases"] / num)),
+        "cardio": int(round(group_totals["cardio"] / num)),
+        "thoracic": int(round(group_totals["thoracic"] / num)),
+        "vascular": int(round(group_totals["vascular"] / num)),
+        "autonomy": int(round(group_totals["autonomy_sum"] / num)),
+        "total_group_cases": int(group_totals["cases"])
+    }
 
     return templates.TemplateResponse(
         "team.html",
@@ -150,6 +146,7 @@ def team_overview(
             "request": request,
             "user": user,
             "resident_stats": resident_stats,
+            "averages": averages,
             "pending_residents": pending_residents,
             "pending_invitations": pending_invitations,
             "success": success,

@@ -3,6 +3,8 @@ Resident routes: dashboard, log CRUD, procedure API endpoint.
 """
 from datetime import datetime, timezone, timedelta
 from collections import defaultdict
+import uuid
+
 
 from fastapi import APIRouter, Depends, Request, Form, HTTPException, Query
 from fastapi.responses import RedirectResponse, JSONResponse
@@ -42,8 +44,8 @@ def dashboard(
         query_proc_ids = db.query(Procedure.id).filter(Procedure.category_id == category)
         base_filter.append(ProcedureLog.procedure_id.in_(query_proc_ids))
 
-    # Total logs count
-    total_logs = db.query(func.count(ProcedureLog.id)).filter(*base_filter).scalar()
+    # Total cases count (unique case_id)
+    total_logs = db.query(func.count(func.distinct(ProcedureLog.case_id))).filter(*base_filter, ProcedureLog.case_id != None).scalar() or 0
 
     # Logs per category for progress display
     cat_query = (
@@ -82,7 +84,19 @@ def dashboard(
     )
     recent_logs = recent_query.all()
 
-    # All categories for the "fast logger" modal and filter chips
+    # Fetch procedures for the "Add Case" modal, grouped by category name
+    all_procs = db.query(Procedure).join(Category).filter(
+        or_(
+            Procedure.team_id == None,
+            Procedure.team_id == user.team_id
+        )
+    ).order_by(Procedure.name).all()
+
+    procedures_by_cat = defaultdict(list)
+    for p in all_procs:
+        procedures_by_cat[p.category.name].append(p)
+
+    # All categories for filter chips
     categories = db.query(Category).filter(
         or_(
             Category.team_id == None,
@@ -177,6 +191,7 @@ def dashboard(
             "autonomy_dict": autonomy_dict,
             "recent_logs": recent_logs,
             "categories": categories,
+            "procedures_by_cat": procedures_by_cat,
             "autonomy_levels": AutonomyLevel,
             "selected_category": category,
             "temporal_chart": temporal_chart,
@@ -217,53 +232,70 @@ def get_procedures_by_category(
 @router.post("/gestes/ajouter")
 def add_log(
     request: Request,
-    procedure_ids: list[int] = Form(...),
-    autonomy_levels: list[str] = Form(...),
+    intervention_id: int = Form(...),
+    intervention_autonomy: str = Form(...),
+    
+    # Optional lists. FastAPI matches "procedure_ids" inputs into a list.
+    procedure_ids: list[int] = Form([]),
+    procedure_autonomies: list[str] = Form([]),
+    
+    complication_ids: list[int] = Form([]),
+    complication_autonomies: list[str] = Form([]),
+    
     date: str = Form(...),
     notes: str = Form(""),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Create a new procedure log entry (or multiple entries for a case)."""
-    # Parse date from the form (DD/MM/YYYY format)
+    """Create a new Case (Intervention + optional Gestures + Complications)."""
+    # Parse date
     try:
         log_date = datetime.strptime(date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
     except ValueError:
+        log_date = datetime.now(timezone.utc)
+
+    # Generate Case ID
+    case_uid = str(uuid.uuid4())
+
+    # Helper to create log
+    def create_log(pid, auto_level_str):
         try:
-            log_date = datetime.strptime(date, "%d/%m/%Y").replace(tzinfo=timezone.utc)
+            level = AutonomyLevel(auto_level_str)
         except ValueError:
-            log_date = datetime.now(timezone.utc)
-
-    # Validate that we have matching lists
-    if len(procedure_ids) != len(autonomy_levels):
-        raise HTTPException(status_code=400, detail="Discrepancy between procedures and autonomy levels.")
-
-    for pid, auto_level in zip(procedure_ids, autonomy_levels):
-        # Validate autonomy level
-        try:
-            level = AutonomyLevel(auto_level)
-        except ValueError:
-            continue # Skip invalid autonomy levels
-
-        # Security check: ensure procedure exists and is accessible by the user's team
-        proc = db.query(Procedure).filter(Procedure.id == pid).first()
-        if not proc:
-            continue # Skip invalid procedure IDs
+            return None
         
-        if proc.team_id and proc.team_id != user.team_id:
-            continue # Skip inaccessible procedures
-
-        new_log = ProcedureLog(
+        # Verify proc exists/access
+        proc = db.query(Procedure).filter(Procedure.id == pid).first()
+        if not proc: return None
+        if proc.team_id and proc.team_id != user.team_id: return None
+        
+        return ProcedureLog(
             user_id=user.id,
             procedure_id=pid,
             date=log_date,
             autonomy_level=level,
-            notes=notes if notes else None,
+            case_id=case_uid,
+            notes=notes if notes else None
         )
-        db.add(new_log)
-    
-    db.commit()
 
+    # 1. Intervention (Mandatory)
+    main_log = create_log(intervention_id, intervention_autonomy)
+    if not main_log:
+        raise HTTPException(400, "Intervention ou autonomie invalide.")
+    db.add(main_log)
+
+    # 2. Gestures (Optional)
+    # Zip IDs and Autonomies. The order is preserved by browser submission.
+    for pid, auto in zip(procedure_ids, procedure_autonomies):
+        plog = create_log(pid, auto)
+        if plog: db.add(plog)
+
+    # 3. Complications (Optional)
+    for pid, auto in zip(complication_ids, complication_autonomies):
+        plog = create_log(pid, auto)
+        if plog: db.add(plog)
+
+    db.commit()
     return RedirectResponse("/tableau-de-bord", status_code=303)
 
 

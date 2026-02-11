@@ -46,6 +46,42 @@
     </div>
     {% endif %}
 
+    <!-- Analytics Dashboard -->
+    {% if resident_stats and averages %}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+        <div class="bg-white p-4 rounded-2xl border border-surface-200 shadow-sm">
+            <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Total Groupe</h3>
+            <div class="flex items-baseline gap-2">
+                <span class="text-2xl font-bold text-primary-900">{{ averages.total_group_cases }}</span>
+            </div>
+        </div>
+        <div class="bg-white p-4 rounded-2xl border border-surface-200 shadow-sm">
+            <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Moyenne Globale</h3>
+            <div class="flex items-baseline gap-2">
+                <span class="text-2xl font-bold text-gray-900">{{ averages.cases }}</span>
+            </div>
+        </div>
+        <div class="bg-white p-4 rounded-2xl border border-surface-200 shadow-sm">
+            <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Moyenne Cardio</h3>
+            <div class="flex items-baseline gap-2">
+                <span class="text-2xl font-bold text-rose-600">{{ averages.cardio }}</span>
+            </div>
+        </div>
+        <div class="bg-white p-4 rounded-2xl border border-surface-200 shadow-sm">
+            <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Moyenne Thoracique</h3>
+            <div class="flex items-baseline gap-2">
+                <span class="text-2xl font-bold text-blue-600">{{ averages.thoracic }}</span>
+            </div>
+        </div>
+        <div class="bg-white p-4 rounded-2xl border border-surface-200 shadow-sm">
+            <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Autonomie Moy.</h3>
+            <div class="flex items-baseline gap-2">
+                <span class="text-2xl font-bold text-teal-600">{{ averages.autonomy }}%</span>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Pending Requests -->
     {% if pending_residents %}
     <div class="mb-8 p-6 bg-amber-50 border border-amber-200 rounded-2xl">
@@ -168,12 +204,21 @@
                         <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-4">
                             Interne</th>
                         <th class="text-center text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-4">
-                            Total gestes</th>
+                            Total</th>
+                        <th
+                            class="text-center text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-4 text-rose-600">
+                            Cardio</th>
+                        <th
+                            class="text-center text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-4 text-blue-600">
+                            Thoracique</th>
+                        <th
+                            class="text-center text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-4 text-purple-600">
+                            Vasculaire</th>
                         <th class="text-center text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-4">
-                            Autonomes</th>
+                            Autonomie</th>
                         <th
                             class="text-center text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-4 hidden sm:table-cell">
-                            Dernier geste</th>
+                            Dernier</th>
                         <th class="text-right text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-4">
                             Action</th>
                     </tr>
@@ -197,14 +242,52 @@
                             <span class="text-lg font-bold text-gray-800">{{ stat.total_logs }}</span>
                         </td>
                         <td class="px-6 py-4 text-center">
-                            <span
-                                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium badge-autonomous">
-                                ✓ {{ stat.autonomous_count }}
-                            </span>
+                            <div class="flex items-center justify-center gap-1">
+                                <span
+                                    class="font-medium {{ 'text-rose-700 font-bold' if averages and stat.cardio_count > averages.cardio else 'text-gray-500' }}">
+                                    {{ stat.cardio_count }}
+                                </span>
+                                {% if averages and stat.cardio_count > averages.cardio %}
+                                <span class="text-xs text-rose-500">↑</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <div class="flex items-center justify-center gap-1">
+                                <span
+                                    class="font-medium {{ 'text-blue-700 font-bold' if averages and stat.thoracic_count > averages.thoracic else 'text-gray-500' }}">
+                                    {{ stat.thoracic_count }}
+                                </span>
+                                {% if averages and stat.thoracic_count > averages.thoracic %}
+                                <span class="text-xs text-blue-500">↑</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <div class="flex items-center justify-center gap-1">
+                                <span
+                                    class="font-medium {{ 'text-purple-700 font-bold' if averages and stat.vascular_count > averages.vascular else 'text-gray-500' }}">
+                                    {{ stat.vascular_count }}
+                                </span>
+                                {% if averages and stat.vascular_count > averages.vascular %}
+                                <span class="text-xs text-purple-500">↑</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <div class="flex items-center justify-center gap-1">
+                                <span
+                                    class="font-medium {{ 'text-teal-700 font-bold' if averages and stat.autonomy_pct > averages.autonomy else 'text-gray-500' }}">
+                                    {{ stat.autonomy_pct }}%
+                                </span>
+                                {% if averages and stat.autonomy_pct > averages.autonomy %}
+                                <span class="text-xs text-teal-500">↑</span>
+                                {% endif %}
+                            </div>
                         </td>
                         <td class="px-6 py-4 text-center hidden sm:table-cell">
                             {% if stat.last_log_date %}
-                            <span class="text-sm text-gray-600">{{ stat.last_log_date.strftime('%d/%m/%Y') }}</span>
+                            <span class="text-sm text-gray-600">{{ stat.last_log_date.strftime('%d/%m') }}</span>
                             {% else %}
                             <span class="text-xs text-gray-400">—</span>
                             {% endif %}
@@ -213,10 +296,6 @@
                             <a href="/equipe/{{ stat.user.id }}"
                                 class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary-600 bg-primary-50 rounded-lg hover:bg-primary-100 transition">
                                 Détails
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M9 5l7 7-7 7" />
-                                </svg>
                             </a>
                         </td>
                     </tr>

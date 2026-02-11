@@ -148,6 +148,7 @@ class ProcedureLog(Base):
     procedure_id = Column(Integer, ForeignKey("procedures.id"), nullable=False)
     date = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     autonomy_level = Column(SAEnum(AutonomyLevel), nullable=False)
+    case_id = Column(String(36), nullable=True, index=True) # Grouping ID for multi-procedure cases
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
