@@ -17,7 +17,7 @@ def send_email(subject: str, recipients: List[str], html_body: str):
     Run this in a BackgroundTask (FastAPI will run it in a threadpool).
     """
     if not SMTP_USERNAME or not SMTP_PASSWORD:
-        print("SMTP credentials (MAIL_USERNAME/MAIL_PASSWORD) not set. Skipping email.")
+        print(f"SMTP credentials not set. MAIL_USERNAME='{SMTP_USERNAME}', MAIL_PASSWORD={'***' if SMTP_PASSWORD else 'None'}. Skipping email.")
         return
 
     try:

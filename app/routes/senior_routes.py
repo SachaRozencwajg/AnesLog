@@ -21,6 +21,7 @@ templates = Jinja2Templates(directory="app/templates")
 def team_overview(
     request: Request,
     user: User = Depends(require_senior),
+    success: str | None = None,
     db: Session = Depends(get_db),
 ):
     """
@@ -86,6 +87,7 @@ def team_overview(
             "user": user,
             "resident_stats": resident_stats,
             "pending_residents": pending_residents,
+            "success": success,
         },
     )
 
@@ -106,7 +108,7 @@ def approve_resident(
     db.commit()
     
     # Ideally redirect back
-    return RedirectResponse("/equipe", status_code=303)
+    return RedirectResponse("/equipe?success=Interne+validé", status_code=303)
 
 
 @router.post("/equipe/reject/{resident_id}")
@@ -121,7 +123,7 @@ def reject_resident(
         db.delete(resident)
         db.commit()
         
-    return RedirectResponse("/equipe", status_code=303)
+    return RedirectResponse("/equipe?success=Demande+rejetée", status_code=303)
 
 
 # ---------------------------------------------------------------------------
@@ -368,6 +370,6 @@ def invite_resident(
         """
         background_tasks.add_task(send_email, subject, [email], body)
         
-    return RedirectResponse("/equipe", status_code=303)
+    return RedirectResponse("/equipe?success=Invitations+envoyées", status_code=303)
 
 

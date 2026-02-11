@@ -17,13 +17,19 @@ Base.metadata.create_all(bind=engine)
 # Run simple migration for new columns (SQLite specific)
 import sqlite3
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def run_migrations():
-    """Add columns to users table for profile features."""
+    """Ensure all tables exist and have required columns (for SQLite)."""
     # Only run for SQLite
     db_url = os.getenv("DATABASE_URL", "sqlite:///./aneslog.db")
     if "sqlite" not in db_url:
         return
+
+    # 1. Create all missing tables first
+    Base.metadata.create_all(bind=engine)
 
     db_path = db_url.replace("sqlite:///", "").replace("./", "")
     if not os.path.exists(db_path):
@@ -33,20 +39,29 @@ def run_migrations():
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         
-        columns = [
-            ("semester", "INTEGER"),
-            ("start_date", "DATETIME"),
-            ("end_date", "DATETIME"),
-            ("institution", "VARCHAR(255)"),
-            ("is_active", "BOOLEAN DEFAULT 0")
+        # 2. Add missing columns to existing tables
+        migrations = [
+            ("users", "semester", "INTEGER"),
+            ("users", "start_date", "DATETIME"),
+            ("users", "end_date", "DATETIME"),
+            ("users", "institution", "VARCHAR(255)"),
+            ("users", "is_active", "BOOLEAN DEFAULT 0"),
+            ("users", "team_id", "INTEGER"),
+            ("users", "is_approved", "BOOLEAN DEFAULT 0"),
+            ("categories", "team_id", "INTEGER"),
+            ("procedures", "team_id", "INTEGER"),
         ]
         
-        for col_name, col_type in columns:
+        for table, col_name, col_type in migrations:
             try:
-                cursor.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_type}")
-                print(f"Migration: Added column {col_name}")
-                if col_name == "is_active":
+                cursor.execute(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_type}")
+                print(f"Migration: Added column {col_name} to {table}")
+                
+                # Special cases for data initialization
+                if table == "users" and col_name == "is_active":
                     cursor.execute("UPDATE users SET is_active = 1")
+                if table == "users" and col_name == "is_approved":
+                    cursor.execute("UPDATE users SET is_approved = 1")
             except sqlite3.OperationalError as e:
                 # Ignore "duplicate column name" error
                 pass
