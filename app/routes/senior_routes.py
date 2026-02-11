@@ -5,7 +5,8 @@ from fastapi import APIRouter, Depends, Request, Form, BackgroundTasks
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, or_
+from collections import defaultdict
 
 from app.database import get_db
 from app.models import User, Category, Procedure, ProcedureLog, AutonomyLevel, UserRole
@@ -233,3 +234,134 @@ def invite_resident(
         background_tasks.add_task(send_email, subject, [email], body)
         
     return RedirectResponse("/equipe", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Procedure Management
+# ---------------------------------------------------------------------------
+
+@router.get("/equipe/actes")
+def manage_procedures(
+    request: Request,
+    user: User = Depends(require_senior),
+    db: Session = Depends(get_db),
+):
+    """
+    Interface for seniors to add Categories and Procedures specific to their team.
+    """
+    if not user.team_id:
+        return RedirectResponse("/equipe", status_code=303)
+
+    # Fetch Global + Team Categories
+    categories = db.query(Category).filter(
+        or_(
+            Category.team_id == None,
+            Category.team_id == user.team_id
+        )
+    ).order_by(Category.name).all()
+    
+    procedures = db.query(Procedure).filter(
+        or_(
+            Procedure.team_id == None,
+            Procedure.team_id == user.team_id
+        )
+    ).all()
+    
+    # Map items to categories
+    items_by_cat = defaultdict(list)
+    for p in procedures:
+        items_by_cat[p.category_id].append(p)
+        
+    # Sort items
+    for cat_id in items_by_cat:
+        items_by_cat[cat_id].sort(key=lambda x: x.name)
+
+    return templates.TemplateResponse(
+        "procedures_config.html",
+        {
+            "request": request,
+            "user": user,
+            "categories": categories,
+            "items_by_cat": items_by_cat,
+        }
+    )
+
+
+@router.post("/equipe/actes/categories")
+def add_category(
+    request: Request,
+    name: str = Form(...),
+    user: User = Depends(require_senior),
+    db: Session = Depends(get_db),
+):
+    if not user.team_id:
+        return RedirectResponse("/equipe", status_code=303)
+        
+    # Check duplicate in team
+    exists = db.query(Category).filter(
+        Category.name == name.strip(),
+        Category.team_id == user.team_id
+    ).first()
+    
+    if not exists:
+        new_cat = Category(name=name.strip(), team_id=user.team_id)
+        db.add(new_cat)
+        db.commit()
+        
+    return RedirectResponse("/equipe/actes", status_code=303)
+
+
+@router.post("/equipe/actes/procedures")
+def add_procedure(
+    request: Request,
+    category_id: int = Form(...),
+    name: str = Form(...),
+    user: User = Depends(require_senior),
+    db: Session = Depends(get_db),
+):
+    if not user.team_id:
+        return RedirectResponse("/equipe", status_code=303)
+        
+    # Verify category access
+    cat = db.query(Category).get(category_id)
+    if not cat:
+        return RedirectResponse("/equipe/actes", status_code=303)
+    if cat.team_id and cat.team_id != user.team_id:
+        return RedirectResponse("/equipe/actes", status_code=303)
+        
+    new_proc = Procedure(
+        name=name.strip(), 
+        category_id=category_id, 
+        team_id=user.team_id
+    )
+    db.add(new_proc)
+    db.commit()
+    
+    return RedirectResponse("/equipe/actes", status_code=303)
+
+
+@router.post("/equipe/actes/procedures/{proc_id}/supprimer")
+def delete_procedure(
+    proc_id: int,
+    user: User = Depends(require_senior),
+    db: Session = Depends(get_db),
+):
+    proc = db.query(Procedure).get(proc_id)
+    if proc and proc.team_id == user.team_id:
+        db.delete(proc)
+        db.commit()
+    # Cannot delete global items
+    return RedirectResponse("/equipe/actes", status_code=303)
+
+
+@router.post("/equipe/actes/categories/{cat_id}/supprimer")
+def delete_category(
+    cat_id: int,
+    user: User = Depends(require_senior),
+    db: Session = Depends(get_db),
+):
+    cat = db.query(Category).get(cat_id)
+    if cat and cat.team_id == user.team_id:
+        db.delete(cat)
+        db.commit()
+    return RedirectResponse("/equipe/actes", status_code=303)

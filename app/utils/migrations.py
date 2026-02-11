@@ -75,7 +75,29 @@ def run_postgres_migrations():
                 conn.commit()
                 print("Migration: Team seed complete.")
             else:
-                print("Migration: 'is_active' column already exists.")
+                print("Migration: 'team_id' column already exists in users.")
+
+            # Check categories.team_id
+            result = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='categories' AND column_name='team_id';"))
+            if not result.fetchone():
+                print("Migration: Adding team_id to categories.")
+                conn.execute(text("ALTER TABLE categories ADD COLUMN team_id INTEGER REFERENCES teams(id);"))
+                
+                # Drop unique constraint on name (categories_name_key)
+                try:
+                    conn.execute(text("ALTER TABLE categories DROP CONSTRAINT IF EXISTS categories_name_key;"))
+                    print("Migration: Dropped categories_name_key constraint.")
+                except Exception as e:
+                    print(f"Warning: Could not drop constraint categories_name_key: {e}")
+                
+                conn.commit()
+
+            # Check procedures.team_id
+            result = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='procedures' AND column_name='team_id';"))
+            if not result.fetchone():
+                print("Migration: Adding team_id to procedures.")
+                conn.execute(text("ALTER TABLE procedures ADD COLUMN team_id INTEGER REFERENCES teams(id);"))
+                conn.commit()
 
     except Exception as e:
         print(f"Postgres migration failed: {e}")

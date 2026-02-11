@@ -95,7 +95,11 @@ class Category(Base):
     __tablename__ = "categories"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(255), unique=True, nullable=False)
+    name = Column(String(255), unique=False, nullable=False) # Unique constraint removed (handled by logic/composite)
+    
+    # Team specificity (Null = Global)
+    team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)
+    team = relationship("Team")
 
     # Relationships
     procedures = relationship("Procedure", back_populates="category", cascade="all, delete-orphan")
@@ -114,6 +118,10 @@ class Procedure(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=False)
+
+    # Team specificity (Null = Global, or inherits from Category)
+    team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)
+    team = relationship("Team")
 
     # Relationships
     category = relationship("Category", back_populates="procedures")

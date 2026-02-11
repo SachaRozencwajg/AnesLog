@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Request, Form, HTTPException, Query
 from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
-from sqlalchemy import func, extract
+from sqlalchemy import func, extract, or_
 
 from app.database import get_db
 from app.models import User, Category, Procedure, ProcedureLog, AutonomyLevel, UserRole
@@ -83,7 +83,12 @@ def dashboard(
     recent_logs = recent_query.all()
 
     # All categories for the "fast logger" modal and filter chips
-    categories = db.query(Category).order_by(Category.name).all()
+    categories = db.query(Category).filter(
+        or_(
+            Category.team_id == None,
+            Category.team_id == user.team_id
+        )
+    ).order_by(Category.name).all()
 
     # -------------------------------------------------------------------
     # Temporal progression data (last 6 months, grouped by month)
@@ -165,6 +170,12 @@ def get_procedures_by_category(
     procedures = (
         db.query(Procedure)
         .filter(Procedure.category_id == category_id)
+        .filter(
+            or_(
+                Procedure.team_id == None,
+                Procedure.team_id == user.team_id
+            )
+        )
         .order_by(Procedure.name)
         .all()
     )
@@ -242,7 +253,13 @@ def logbook(
             pass
 
     logs = query.order_by(ProcedureLog.date.desc()).all()
-    categories = db.query(Category).order_by(Category.name).all()
+    # Filter categories by team
+    categories = db.query(Category).filter(
+        or_(
+            Category.team_id == None,
+            Category.team_id == user.team_id
+        )
+    ).order_by(Category.name).all()
 
     # Count total (unfiltered) for display
     total_count = db.query(func.count(ProcedureLog.id)).filter(
