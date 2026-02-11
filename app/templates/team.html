@@ -113,6 +113,51 @@
         </form>
     </div>
 
+    <!-- Pending Invitations -->
+    {% if pending_invitations %}
+    <div class="mb-8 p-6 bg-white border border-surface-200 rounded-2xl shadow-sm">
+        <div class="flex items-center gap-2 mb-4">
+            <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <h2 class="text-lg font-bold text-gray-900">Invitations envoyées</h2>
+        </div>
+        <div class="overflow-hidden border border-gray-100 rounded-xl">
+            <table class="w-full text-left">
+                <thead class="bg-gray-50 border-b border-gray-100">
+                    <tr>
+                        <th class="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Email</th>
+                        <th class="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Date d'envoi
+                        </th>
+                        <th class="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">
+                            Action</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50 bg-white">
+                    {% for invite in pending_invitations %}
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-4 py-3 text-sm text-gray-900 font-medium">{{ invite.email }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-500">
+                            {{ invite.created_at.strftime('%d/%m/%Y') }}
+                        </td>
+                        <td class="px-4 py-3 text-right">
+                            <form action="/equipe/invite" method="post" class="inline-block">
+                                <input type="hidden" name="email_list" value="{{ invite.email }}">
+                                <button type="submit"
+                                    class="text-primary-600 hover:text-primary-800 text-xs font-medium bg-primary-50 px-3 py-1 rounded-lg transition-colors">
+                                    Relancer
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
     {% if resident_stats %}
     <!-- Desktop table view -->
     <div class="bg-white rounded-2xl border border-surface-200 overflow-hidden">

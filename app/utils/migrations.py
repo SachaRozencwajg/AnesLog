@@ -99,5 +99,23 @@ def run_postgres_migrations():
                 conn.execute(text("ALTER TABLE procedures ADD COLUMN team_id INTEGER REFERENCES teams(id);"))
                 conn.commit()
 
+            # Check invitations table
+            try:
+                conn.execute(text("SELECT 1 FROM invitations LIMIT 1;"))
+            except Exception:
+                pass
+
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS invitations (
+                    id SERIAL PRIMARY KEY,
+                    email VARCHAR(255) NOT NULL,
+                    team_id INTEGER REFERENCES teams(id),
+                    status VARCHAR(50) DEFAULT 'pending',
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                );
+            """))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_invitations_email ON invitations (email);"))
+            conn.commit()
+
     except Exception as e:
         print(f"Postgres migration failed: {e}")

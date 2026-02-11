@@ -9,7 +9,7 @@ from sqlalchemy import func, or_
 from collections import defaultdict
 
 from app.database import get_db
-from app.models import User, Category, Procedure, ProcedureLog, AutonomyLevel, UserRole
+from app.models import User, Category, Procedure, ProcedureLog, AutonomyLevel, UserRole, Invitation, InvitationStatus
 from app.auth import require_senior
 from app.utils.email import send_email
 
@@ -47,11 +47,17 @@ def team_overview(
         User.is_approved == True
     ).all()
 
-    # Pending residents
+    # Pending residents (signed up but not approved)
     pending_residents = db.query(User).filter(
         User.role == UserRole.resident,
         User.team_id == user.team_id,
         User.is_approved == False
+    ).all()
+
+    # Pending Invitations (emailed but not signed up)
+    pending_invitations = db.query(Invitation).filter(
+        Invitation.team_id == user.team_id,
+        Invitation.status == InvitationStatus.pending
     ).all()
 
     # Build summary stats for APPROVED residents
@@ -87,6 +93,7 @@ def team_overview(
             "user": user,
             "resident_stats": resident_stats,
             "pending_residents": pending_residents,
+            "pending_invitations": pending_invitations,
             "success": success,
         },
     )
@@ -355,6 +362,23 @@ def invite_resident(
     subject = f"{user.full_name} vous invite à rejoindre son équipe sur AnesLog"
     
     for email in emails:
+        # 1. Check if user already exists (skip adding invitation record, but maybe still send email?)
+        # For pending status feature, we only track non-existing users.
+        existing_user = db.query(User).filter(User.email == email).first()
+        if existing_user:
+            # If they exist, we just send the email notification as before
+            pass 
+        else:
+            # 2. Create Invitation record
+            existing_invite = db.query(Invitation).filter(
+                Invitation.email == email,
+                Invitation.team_id == user.team_id
+            ).first()
+            
+            if not existing_invite:
+                new_invite = Invitation(email=email, team_id=user.team_id)
+                db.add(new_invite)
+            
         body = f"""
         <html>
         <body style="font-family: Arial, sans-serif; color: #333;">
@@ -369,7 +393,8 @@ def invite_resident(
         </html>
         """
         background_tasks.add_task(send_email, subject, [email], body)
-        
+    
+    db.commit()    
     return RedirectResponse("/equipe?success=Invitations+envoyées", status_code=303)
 
 

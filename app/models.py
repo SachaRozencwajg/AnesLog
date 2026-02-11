@@ -39,6 +39,12 @@ class AutonomyLevel(str, enum.Enum):
     autonomous = "Je suis autonome"
 
 
+class InvitationStatus(str, enum.Enum):
+    pending = "pending"
+    accepted = "accepted"
+    expired = "expired"
+
+
 # ---------------------------------------------------------------------------
 # Models
 # ---------------------------------------------------------------------------
@@ -151,3 +157,22 @@ class ProcedureLog(Base):
 
     def __repr__(self):
         return f"<Log {self.user_id} – {self.procedure.name} ({self.autonomy_level.value})>"
+
+
+class Invitation(Base):
+    """
+    Tracks pending email invitations to join a team.
+    """
+    __tablename__ = "invitations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(255), nullable=False, index=True)
+    team_id = Column(Integer, ForeignKey("teams.id"), nullable=False)
+    status = Column(SAEnum(InvitationStatus), default=InvitationStatus.pending)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    # Relationships
+    team = relationship("Team")
+
+    def __repr__(self):
+        return f"<Invitation {self.email} -> {self.team_id} ({self.status.value})>"
