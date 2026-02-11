@@ -1,7 +1,7 @@
 """
 Senior routes: team overview and resident drill-down.
 """
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Form, BackgroundTasks
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -10,6 +10,7 @@ from sqlalchemy import func
 from app.database import get_db
 from app.models import User, Category, Procedure, ProcedureLog, AutonomyLevel, UserRole
 from app.auth import require_senior
+from app.utils.email import send_email
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -191,3 +192,44 @@ def resident_detail(
             "category_counts": [cs[1] for cs in category_stats],
         },
     )
+
+
+@router.post("/equipe/invite")
+def invite_resident(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    email_list: str = Form(...),
+    user: User = Depends(require_senior),
+    db: Session = Depends(get_db),
+):
+    """Send invitation emails to residents."""
+    emails = [e.strip() for e in email_list.split(",") if e.strip()]
+    if not emails:
+        return RedirectResponse("/equipe", status_code=303)
+        
+    base_url = str(request.base_url).rstrip("/")
+    if user.team_id:
+        # Pre-fill team_id and role=resident logic in UI
+        invite_link = f"{base_url}/inscription?team_id={user.team_id}"
+    else:
+        invite_link = f"{base_url}/inscription"
+        
+    subject = f"{user.full_name} vous invite à rejoindre son équipe sur AnesLog"
+    
+    for email in emails:
+        body = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; color: #333;">
+            <p>Bonjour,</p>
+            <p>Le Dr. {user.full_name} vous invite à rejoindre son équipe sur AnesLog.</p>
+            <p>Cliquez sur le lien ci-dessous pour créer votre compte et rejoindre l'équipe automatiquement :</p>
+            <p style="text-align: center; margin: 20px 0;">
+                <a href="{invite_link}" style="background-color: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Rejoindre l'équipe</a>
+            </p>
+            <p style="font-size: 12px; color: #666;">Lien : {invite_link}</p>
+        </body>
+        </html>
+        """
+        background_tasks.add_task(send_email, subject, [email], body)
+        
+    return RedirectResponse("/equipe", status_code=303)

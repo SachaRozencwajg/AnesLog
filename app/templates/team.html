@@ -55,6 +55,29 @@
     </div>
     {% endif %}
 
+    <!-- Invite Residents -->
+    <div class="mb-8 p-6 bg-white border border-surface-200 rounded-2xl shadow-sm">
+        <div class="flex items-center gap-2 mb-4">
+            <svg class="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+            <h2 class="text-lg font-bold text-gray-900">Inviter des internes</h2>
+        </div>
+        <p class="text-sm text-gray-500 mb-4">Envoyez une invitation par email. Les internes recevront un lien pour
+            créer leur compte et rejoindre l'équipe automatiquement.</p>
+
+        <form action="/equipe/invite" method="post" class="flex flex-col sm:flex-row gap-3">
+            <input type="text" name="email_list" required
+                placeholder="Emails séparés par des virgules (ex: a@chu.fr, b@chu.fr)"
+                class="flex-1 px-4 py-2.5 rounded-xl border border-surface-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm">
+            <button type="submit"
+                class="px-6 py-2.5 bg-primary-600 text-white font-medium rounded-xl hover:bg-primary-700 transition shadow-sm whitespace-nowrap">
+                Envoyer les invitations
+            </button>
+        </form>
+    </div>
+
     {% if resident_stats %}
     <!-- Desktop table view -->
     <div class="bg-white rounded-2xl border border-surface-200 overflow-hidden">

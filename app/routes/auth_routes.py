@@ -74,9 +74,20 @@ def login_submit(
 
 
 @router.get("/inscription")
-def register_page(request: Request, db: Session = Depends(get_db)):
+def register_page(
+    request: Request, 
+    team_id: str | None = None, 
+    db: Session = Depends(get_db)
+):
     teams = db.query(Team).order_by(Team.name).all()
-    return templates.TemplateResponse("register.html", {"request": request, "teams": teams})
+    return templates.TemplateResponse(
+        "register.html", 
+        {
+            "request": request, 
+            "teams": teams, 
+            "preselected_team_id": team_id
+        }
+    )
 
 
 @router.post("/inscription")

@@ -25,7 +25,8 @@
             </div>
             {% endif %}
 
-            <form method="post" action="/inscription" class="space-y-4" x-data="{ role: 'resident', teamId: '' }">
+            <form method="post" action="/inscription" class="space-y-4"
+                x-data="{ role: 'resident', teamId: '{{ preselected_team_id if preselected_team_id else '' }}' }">
                 <div>
                     <label for="full_name" class="block text-sm font-medium text-gray-600 mb-1">Nom complet</label>
                     <input type="text" id="full_name" name="full_name" required autocomplete="name"
