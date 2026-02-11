@@ -1,13 +1,14 @@
 """
 Resident routes: dashboard, log CRUD, procedure API endpoint.
 """
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+from collections import defaultdict
 
-from fastapi import APIRouter, Depends, Request, Form, HTTPException
+from fastapi import APIRouter, Depends, Request, Form, HTTPException, Query
 from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, extract
 
 from app.database import get_db
 from app.models import User, Category, Procedure, ProcedureLog, AutonomyLevel, UserRole
@@ -24,6 +25,7 @@ templates = Jinja2Templates(directory="app/templates")
 @router.get("/tableau-de-bord")
 def dashboard(
     request: Request,
+    category: int | None = Query(None, alias="categorie"),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -32,13 +34,19 @@ def dashboard(
     if user.role == UserRole.senior:
         return RedirectResponse("/equipe", status_code=303)
 
+    # Base filter for this user
+    base_filter = [ProcedureLog.user_id == user.id]
+
+    # Apply optional category filter
+    if category:
+        proc_ids = [p.id for p in db.query(Procedure.id).filter(Procedure.category_id == category).all()]
+        base_filter.append(ProcedureLog.procedure_id.in_(proc_ids))
+
     # Total logs count
-    total_logs = db.query(func.count(ProcedureLog.id)).filter(
-        ProcedureLog.user_id == user.id
-    ).scalar()
+    total_logs = db.query(func.count(ProcedureLog.id)).filter(*base_filter).scalar()
 
     # Logs per category for progress display
-    category_stats = (
+    cat_query = (
         db.query(
             Category.name,
             func.count(ProcedureLog.id).label("count"),
@@ -46,9 +54,10 @@ def dashboard(
         .join(Procedure, Procedure.category_id == Category.id)
         .join(ProcedureLog, ProcedureLog.procedure_id == Procedure.id)
         .filter(ProcedureLog.user_id == user.id)
-        .group_by(Category.name)
-        .all()
     )
+    if category:
+        cat_query = cat_query.filter(Procedure.category_id == category)
+    category_stats = cat_query.group_by(Category.name).all()
 
     # Autonomy distribution
     autonomy_stats = (
@@ -56,7 +65,7 @@ def dashboard(
             ProcedureLog.autonomy_level,
             func.count(ProcedureLog.id).label("count"),
         )
-        .filter(ProcedureLog.user_id == user.id)
+        .filter(*base_filter)
         .group_by(ProcedureLog.autonomy_level)
         .all()
     )
@@ -65,16 +74,65 @@ def dashboard(
         autonomy_dict[level.value] = count
 
     # Recent logs (last 5)
-    recent_logs = (
+    recent_query = (
         db.query(ProcedureLog)
-        .filter(ProcedureLog.user_id == user.id)
+        .filter(*base_filter)
         .order_by(ProcedureLog.date.desc())
         .limit(5)
+    )
+    recent_logs = recent_query.all()
+
+    # All categories for the "fast logger" modal and filter chips
+    categories = db.query(Category).order_by(Category.name).all()
+
+    # -------------------------------------------------------------------
+    # Temporal progression data (last 6 months, grouped by month)
+    # -------------------------------------------------------------------
+    six_months_ago = datetime.now(timezone.utc) - timedelta(days=180)
+
+    temporal_logs = (
+        db.query(ProcedureLog)
+        .filter(
+            ProcedureLog.user_id == user.id,
+            ProcedureLog.date >= six_months_ago,
+        )
         .all()
     )
 
-    # All categories for the "fast logger" modal
-    categories = db.query(Category).order_by(Category.name).all()
+    # Build monthly buckets
+    month_labels = []
+    now = datetime.now(timezone.utc)
+    for i in range(5, -1, -1):
+        dt = now - timedelta(days=i * 30)
+        month_labels.append(dt.strftime("%b %Y"))
+
+    # Map each log to its month bucket
+    month_autonomy_data = defaultdict(lambda: {level.value: 0 for level in AutonomyLevel})
+    for log in temporal_logs:
+        label = log.date.strftime("%b %Y")
+        if label in month_labels:
+            month_autonomy_data[label][log.autonomy_level.value] += 1
+
+    # Build chart-ready datasets
+    temporal_chart = {
+        "labels": month_labels,
+        "datasets": []
+    }
+    colors = {
+        "J'ai vu": {"bg": "rgba(251, 191, 36, 0.7)", "border": "rgb(251, 191, 36)"},
+        "J'ai fait avec aide": {"bg": "rgba(96, 165, 250, 0.7)", "border": "rgb(96, 165, 250)"},
+        "Je sais faire": {"bg": "rgba(52, 211, 153, 0.7)", "border": "rgb(52, 211, 153)"},
+        "Je suis autonome": {"bg": "rgba(34, 197, 94, 0.7)", "border": "rgb(34, 197, 94)"},
+    }
+    for level in AutonomyLevel:
+        temporal_chart["datasets"].append({
+            "label": level.value,
+            "data": [month_autonomy_data[m][level.value] for m in month_labels],
+            "backgroundColor": colors[level.value]["bg"],
+            "borderColor": colors[level.value]["border"],
+            "borderWidth": 1,
+            "borderRadius": 4,
+        })
 
     return templates.TemplateResponse(
         "dashboard.html",
@@ -87,6 +145,8 @@ def dashboard(
             "recent_logs": recent_logs,
             "categories": categories,
             "autonomy_levels": AutonomyLevel,
+            "selected_category": category,
+            "temporal_chart": temporal_chart,
         },
     )
 
@@ -157,17 +217,37 @@ def add_log(
 @router.get("/mon-carnet")
 def logbook(
     request: Request,
+    cat: int | None = Query(None, alias="categorie"),
+    autonomy: str | None = Query(None, alias="autonomie"),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Show the resident's full logbook chronologically."""
-    logs = (
+    """Show the resident's full logbook chronologically, with optional filters."""
+    query = (
         db.query(ProcedureLog)
         .filter(ProcedureLog.user_id == user.id)
-        .order_by(ProcedureLog.date.desc())
-        .all()
     )
+
+    # Apply category filter
+    if cat:
+        proc_ids = [p.id for p in db.query(Procedure.id).filter(Procedure.category_id == cat).all()]
+        query = query.filter(ProcedureLog.procedure_id.in_(proc_ids))
+
+    # Apply autonomy filter
+    if autonomy:
+        try:
+            level = AutonomyLevel(autonomy)
+            query = query.filter(ProcedureLog.autonomy_level == level)
+        except ValueError:
+            pass
+
+    logs = query.order_by(ProcedureLog.date.desc()).all()
     categories = db.query(Category).order_by(Category.name).all()
+
+    # Count total (unfiltered) for display
+    total_count = db.query(func.count(ProcedureLog.id)).filter(
+        ProcedureLog.user_id == user.id
+    ).scalar()
 
     return templates.TemplateResponse(
         "logbook.html",
@@ -177,6 +257,9 @@ def logbook(
             "logs": logs,
             "categories": categories,
             "autonomy_levels": AutonomyLevel,
+            "selected_category": cat,
+            "selected_autonomy": autonomy,
+            "total_count": total_count,
         },
     )
 

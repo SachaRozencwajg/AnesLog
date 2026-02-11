@@ -10,6 +10,24 @@
         <p class="text-sm text-gray-500 mt-1">Votre progression en Anesthésie-Réanimation</p>
     </div>
 
+    <!-- Category Filter Pills -->
+    <div class="mb-5">
+        <div class="flex flex-wrap gap-2">
+            <a href="/tableau-de-bord"
+                class="inline-flex items-center px-3.5 py-1.5 rounded-full text-xs font-medium transition-all
+                      {% if not selected_category %}bg-primary-600 text-white shadow-sm{% else %}bg-white text-gray-600 border border-surface-200 hover:border-primary-300 hover:text-primary-600{% endif %}">
+                Toutes
+            </a>
+            {% for cat in categories %}
+            <a href="/tableau-de-bord?categorie={{ cat.id }}"
+                class="inline-flex items-center px-3.5 py-1.5 rounded-full text-xs font-medium transition-all
+                      {% if selected_category == cat.id %}bg-primary-600 text-white shadow-sm{% else %}bg-white text-gray-600 border border-surface-200 hover:border-primary-300 hover:text-primary-600{% endif %}">
+                {{ cat.name }}
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+
     <!-- Stats Cards -->
     <div class="grid grid-cols-2 gap-3 mb-6">
         <div class="bg-white rounded-2xl p-4 border border-surface-200 card-hover">
@@ -39,6 +57,36 @@
                     <p class="text-xs text-gray-500">Autonomes</p>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- 6-Month Temporal Progression Chart -->
+    <div class="bg-white rounded-2xl p-5 border border-surface-200 mb-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-sm font-semibold text-gray-700">Progression sur 6 mois</h2>
+            <div class="flex items-center gap-1">
+                <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                <span class="w-2 h-2 rounded-full bg-green-500"></span>
+            </div>
+        </div>
+        <div class="relative" style="height: 200px;">
+            <canvas id="temporalChart"></canvas>
+        </div>
+        <div class="flex flex-wrap justify-center gap-x-4 gap-y-1 mt-3">
+            <span class="flex items-center gap-1.5 text-xs text-gray-500">
+                <span class="w-2.5 h-2.5 rounded-sm bg-amber-400"></span> J'ai vu
+            </span>
+            <span class="flex items-center gap-1.5 text-xs text-gray-500">
+                <span class="w-2.5 h-2.5 rounded-sm bg-blue-400"></span> Avec aide
+            </span>
+            <span class="flex items-center gap-1.5 text-xs text-gray-500">
+                <span class="w-2.5 h-2.5 rounded-sm bg-emerald-400"></span> Je sais faire
+            </span>
+            <span class="flex items-center gap-1.5 text-xs text-gray-500">
+                <span class="w-2.5 h-2.5 rounded-sm bg-green-500"></span> Autonome
+            </span>
         </div>
     </div>
 
@@ -244,6 +292,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script>
     function fastLogger() {
         return {
@@ -267,5 +316,70 @@
             }
         }
     }
+
+    // 6-month temporal progression chart
+    document.addEventListener('DOMContentLoaded', function () {
+        const chartData = {{ temporal_chart| tojson
+    }};
+    const ctx = document.getElementById('temporalChart');
+    if (!ctx) return;
+
+    new Chart(ctx, {
+        type: 'bar',
+        data: chartData,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                    titleFont: { size: 12, weight: '600' },
+                    bodyFont: { size: 11 },
+                    padding: 10,
+                    cornerRadius: 8,
+                    callbacks: {
+                        footer: function (items) {
+                            let total = 0;
+                            items.forEach(item => total += item.raw);
+                            return 'Total: ' + total;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    stacked: true,
+                    grid: { display: false },
+                    ticks: {
+                        font: { size: 10 },
+                        color: '#94a3b8'
+                    },
+                    border: { display: false }
+                },
+                y: {
+                    stacked: true,
+                    beginAtZero: true,
+                    grid: {
+                        color: 'rgba(226, 232, 240, 0.6)',
+                        drawBorder: false
+                    },
+                    ticks: {
+                        font: { size: 10 },
+                        color: '#94a3b8',
+                        stepSize: 1
+                    },
+                    border: { display: false }
+                }
+            },
+            interaction: {
+                mode: 'index',
+                intersect: false
+            }
+        }
+    });
+    });
 </script>
 {% endblock %}
