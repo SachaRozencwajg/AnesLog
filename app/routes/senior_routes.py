@@ -124,118 +124,6 @@ def reject_resident(
     return RedirectResponse("/equipe", status_code=303)
 
 
-@router.get("/equipe/{resident_id}")
-def resident_detail(
-    resident_id: int,
-    request: Request,
-    user: User = Depends(require_senior),
-    db: Session = Depends(get_db),
-):
-    """
-    Drill-down: show a specific resident's logbook and progress chart.
-    """
-    resident = db.query(User).filter(
-        User.id == resident_id,
-        User.role == UserRole.resident,
-    ).first()
-
-    if not resident:
-        return templates.TemplateResponse(
-            "team.html",
-            {"request": request, "user": user, "resident_stats": [], "error": "Interne non trouvé."},
-        )
-
-    # Get all logs for this resident
-    logs = (
-        db.query(ProcedureLog)
-        .filter(ProcedureLog.user_id == resident_id)
-        .order_by(ProcedureLog.date.desc())
-        .all()
-    )
-
-    # Category-level stats for the chart
-    category_stats = (
-        db.query(
-            Category.name,
-            func.count(ProcedureLog.id).label("count"),
-        )
-        .join(Procedure, Procedure.category_id == Category.id)
-        .join(ProcedureLog, ProcedureLog.procedure_id == Procedure.id)
-        .filter(ProcedureLog.user_id == resident_id)
-        .group_by(Category.name)
-        .all()
-    )
-
-    # Autonomy distribution for chart
-    autonomy_stats = (
-        db.query(
-            ProcedureLog.autonomy_level,
-            func.count(ProcedureLog.id).label("count"),
-        )
-        .filter(ProcedureLog.user_id == resident_id)
-        .group_by(ProcedureLog.autonomy_level)
-        .all()
-    )
-    autonomy_dict = {level.value: 0 for level in AutonomyLevel}
-    for level, count in autonomy_stats:
-        autonomy_dict[level.value] = count
-
-    return templates.TemplateResponse(
-        "resident_detail.html",
-        {
-            "request": request,
-            "user": user,
-            "resident": resident,
-            "logs": logs,
-            "category_stats": category_stats,
-            "autonomy_dict": autonomy_dict,
-            "category_labels": [cs[0] for cs in category_stats],
-            "category_counts": [cs[1] for cs in category_stats],
-        },
-    )
-
-
-@router.post("/equipe/invite")
-def invite_resident(
-    request: Request,
-    background_tasks: BackgroundTasks,
-    email_list: str = Form(...),
-    user: User = Depends(require_senior),
-    db: Session = Depends(get_db),
-):
-    """Send invitation emails to residents."""
-    emails = [e.strip() for e in email_list.split(",") if e.strip()]
-    if not emails:
-        return RedirectResponse("/equipe", status_code=303)
-        
-    base_url = str(request.base_url).rstrip("/")
-    if user.team_id:
-        # Pre-fill team_id and role=resident logic in UI
-        invite_link = f"{base_url}/inscription?team_id={user.team_id}"
-    else:
-        invite_link = f"{base_url}/inscription"
-        
-    subject = f"{user.full_name} vous invite à rejoindre son équipe sur AnesLog"
-    
-    for email in emails:
-        body = f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; color: #333;">
-            <p>Bonjour,</p>
-            <p>Le Dr. {user.full_name} vous invite à rejoindre son équipe sur AnesLog.</p>
-            <p>Cliquez sur le lien ci-dessous pour créer votre compte et rejoindre l'équipe automatiquement :</p>
-            <p style="text-align: center; margin: 20px 0;">
-                <a href="{invite_link}" style="background-color: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Rejoindre l'équipe</a>
-            </p>
-            <p style="font-size: 12px; color: #666;">Lien : {invite_link}</p>
-        </body>
-        </html>
-        """
-        background_tasks.add_task(send_email, subject, [email], body)
-        
-    return RedirectResponse("/equipe", status_code=303)
-
-
 # ---------------------------------------------------------------------------
 # Procedure Management
 # ---------------------------------------------------------------------------
@@ -365,3 +253,121 @@ def delete_category(
         db.delete(cat)
         db.commit()
     return RedirectResponse("/equipe/actes", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Team Details
+# ---------------------------------------------------------------------------
+
+@router.get("/equipe/{resident_id}")
+def resident_detail(
+    resident_id: int,
+    request: Request,
+    user: User = Depends(require_senior),
+    db: Session = Depends(get_db),
+):
+    """
+    Drill-down: show a specific resident's logbook and progress chart.
+    """
+    resident = db.query(User).filter(
+        User.id == resident_id,
+        User.role == UserRole.resident,
+    ).first()
+
+    if not resident:
+        return templates.TemplateResponse(
+            "team.html",
+            {"request": request, "user": user, "resident_stats": [], "error": "Interne non trouvé."},
+        )
+
+    # Get all logs for this resident
+    logs = (
+        db.query(ProcedureLog)
+        .filter(ProcedureLog.user_id == resident_id)
+        .order_by(ProcedureLog.date.desc())
+        .all()
+    )
+
+    # Category-level stats for the chart
+    category_stats = (
+        db.query(
+            Category.name,
+            func.count(ProcedureLog.id).label("count"),
+        )
+        .join(Procedure, Procedure.category_id == Category.id)
+        .join(ProcedureLog, ProcedureLog.procedure_id == Procedure.id)
+        .filter(ProcedureLog.user_id == resident_id)
+        .group_by(Category.name)
+        .all()
+    )
+
+    # Autonomy distribution for chart
+    autonomy_stats = (
+        db.query(
+            ProcedureLog.autonomy_level,
+            func.count(ProcedureLog.id).label("count"),
+        )
+        .filter(ProcedureLog.user_id == resident_id)
+        .group_by(ProcedureLog.autonomy_level)
+        .all()
+    )
+    autonomy_dict = {level.value: 0 for level in AutonomyLevel}
+    for level, count in autonomy_stats:
+        autonomy_dict[level.value] = count
+
+    return templates.TemplateResponse(
+        "resident_detail.html",
+        {
+            "request": request,
+            "user": user,
+            "resident": resident,
+            "logs": logs,
+            "category_stats": category_stats,
+            "autonomy_dict": autonomy_dict,
+            "category_labels": [cs[0] for cs in category_stats],
+            "category_counts": [cs[1] for cs in category_stats],
+        },
+    )
+
+
+@router.post("/equipe/invite")
+def invite_resident(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    email_list: str = Form(...),
+    user: User = Depends(require_senior),
+    db: Session = Depends(get_db),
+):
+    """Send invitation emails to residents."""
+    emails = [e.strip() for e in email_list.split(",") if e.strip()]
+    if not emails:
+        return RedirectResponse("/equipe", status_code=303)
+        
+    base_url = str(request.base_url).rstrip("/")
+    if user.team_id:
+        # Pre-fill team_id and role=resident logic in UI
+        invite_link = f"{base_url}/inscription?team_id={user.team_id}"
+    else:
+        invite_link = f"{base_url}/inscription"
+        
+    subject = f"{user.full_name} vous invite à rejoindre son équipe sur AnesLog"
+    
+    for email in emails:
+        body = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; color: #333;">
+            <p>Bonjour,</p>
+            <p>Le Dr. {user.full_name} vous invite à rejoindre son équipe sur AnesLog.</p>
+            <p>Cliquez sur le lien ci-dessous pour créer votre compte et rejoindre l'équipe automatiquement :</p>
+            <p style="text-align: center; margin: 20px 0;">
+                <a href="{invite_link}" style="background-color: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Rejoindre l'équipe</a>
+            </p>
+            <p style="font-size: 12px; color: #666;">Lien : {invite_link}</p>
+        </body>
+        </html>
+        """
+        background_tasks.add_task(send_email, subject, [email], body)
+        
+    return RedirectResponse("/equipe", status_code=303)
+
+

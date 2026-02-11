@@ -39,8 +39,8 @@ def dashboard(
 
     # Apply optional category filter
     if category:
-        proc_ids = [p.id for p in db.query(Procedure.id).filter(Procedure.category_id == category).all()]
-        base_filter.append(ProcedureLog.procedure_id.in_(proc_ids))
+        query_proc_ids = db.query(Procedure.id).filter(Procedure.category_id == category)
+        base_filter.append(ProcedureLog.procedure_id.in_(query_proc_ids))
 
     # Total logs count
     total_logs = db.query(func.count(ProcedureLog.id)).filter(*base_filter).scalar()
@@ -212,6 +212,14 @@ def add_log(
     except ValueError:
         raise HTTPException(status_code=400, detail="Niveau d'autonomie invalide.")
 
+    # Security check: ensure procedure exists and is accessible by the user's team
+    proc = db.query(Procedure).filter(Procedure.id == procedure_id).first()
+    if not proc:
+        raise HTTPException(status_code=404, detail="Acte non trouvé.")
+    
+    if proc.team_id and proc.team_id != user.team_id:
+        raise HTTPException(status_code=403, detail="Vous n'avez pas accès à cet acte.")
+
     new_log = ProcedureLog(
         user_id=user.id,
         procedure_id=procedure_id,
@@ -241,8 +249,8 @@ def logbook(
 
     # Apply category filter
     if cat:
-        proc_ids = [p.id for p in db.query(Procedure.id).filter(Procedure.category_id == cat).all()]
-        query = query.filter(ProcedureLog.procedure_id.in_(proc_ids))
+        query_proc_ids = db.query(Procedure.id).filter(Procedure.category_id == cat)
+        query = query.filter(ProcedureLog.procedure_id.in_(query_proc_ids))
 
     # Apply autonomy filter
     if autonomy:
