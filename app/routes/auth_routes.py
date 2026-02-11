@@ -147,7 +147,7 @@ async def register_submit(
             
         elif team_id:
             # Join existing team
-            final_team_id = team_id
+            final_team_id = int(team_id)
         else:
             # Did not select or create
             teams = db.query(Team).order_by(Team.name).all()
@@ -161,10 +161,10 @@ async def register_submit(
         if not team_id:
             teams = db.query(Team).order_by(Team.name).all()
             return templates.TemplateResponse(
-                "register.html",
+                "register.html", 
                 {"request": request, "error": "Veuillez sélectionner votre équipe.", "teams": teams}
             )
-        final_team_id = team_id
+        final_team_id = int(team_id)
         is_approved_status = False # Pending senior approval
 
     # Create user
