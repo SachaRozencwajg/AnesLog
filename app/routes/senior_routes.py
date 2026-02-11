@@ -10,7 +10,65 @@ from collections import defaultdict
 
 from app.database import get_db
 from app.models import User, Category, Procedure, ProcedureLog, AutonomyLevel, UserRole, Invitation, InvitationStatus
-from app.auth import require_senior
+from app.auth import require_senior, create_invitation_token
+from app.utils.email import send_email
+
+router = APIRouter()
+templates = Jinja2Templates(directory="app/templates")
+
+@router.post("/equipe/invite")
+def invite_resident(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    email_list: str = Form(...),
+    user: User = Depends(require_senior),
+    db: Session = Depends(get_db),
+):
+    """Send invitation emails to residents."""
+    emails = [e.strip() for e in email_list.split(",") if e.strip()]
+    if not emails:
+        return RedirectResponse("/equipe", status_code=303)
+        
+    base_url = str(request.base_url).rstrip("/")
+    subject = f"{user.full_name} vous invite à rejoindre son équipe sur AnesLog"
+    
+    for email in emails:
+        # Determine invite link with token if team exists
+        if user.team_id:
+            token = create_invitation_token(email, user.team_id)
+            invite_link = f"{base_url}/inscription?token={token}"
+        else:
+            invite_link = f"{base_url}/inscription"
+
+        # 1. Check if user already exists
+        existing_user = db.query(User).filter(User.email == email).first()
+        if existing_user:
+            pass 
+        else:
+            # 2. Create Invitation record
+            existing_invite = db.query(Invitation).filter(
+                Invitation.email == email,
+                Invitation.team_id == user.team_id
+            ).first()
+            
+            if not existing_invite:
+                new_invite = Invitation(email=email, team_id=user.team_id)
+                db.add(new_invite)
+            
+        body = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; color: #333;">
+            <p>Bonjour,</p>
+            <p>Le Dr. {user.full_name} vous invite à rejoindre son équipe sur AnesLog.</p>
+            <p>Cliquez sur le lien ci-dessous pour créer votre compte et rejoindre l'équipe automatiquement :</p>
+            <p style="text-align: center; margin: 20px 0;">
+                <a href="{invite_link}" style="background-color: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Rejoindre l'équipe</a>
+            </p>
+            <p style="font-size: 12px; color: #666;">Lien : {invite_link}</p>
+        </body>
+        </html>
+        """
+        background_tasks.add_task(send_email, subject, [email], body)
 from app.utils.email import send_email
 
 router = APIRouter()

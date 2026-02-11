@@ -93,23 +93,51 @@ def dashboard(
     # -------------------------------------------------------------------
     # Temporal progression data (last 6 months, grouped by month)
     # -------------------------------------------------------------------
-    six_months_ago = datetime.now(timezone.utc) - timedelta(days=180)
+    # -------------------------------------------------------------------
+    # Temporal progression data (Semester period or last 6 months)
+    # -------------------------------------------------------------------
+    
+    # Determine date range
+    query_end = datetime.now(timezone.utc)
+    query_start = query_end - timedelta(days=180)
+    
+    if user.start_date and user.end_date:
+        # Use profile dates if available
+        query_start = user.start_date
+        if query_start.tzinfo is None:
+            query_start = query_start.replace(tzinfo=timezone.utc)
+            
+        query_end = user.end_date
+        if query_end.tzinfo is None:
+            query_end = query_end.replace(tzinfo=timezone.utc)
+        # Include the full end date (end of day approx)
+        query_end = query_end + timedelta(days=1) - timedelta(seconds=1)
 
     temporal_logs = (
         db.query(ProcedureLog)
         .filter(
             ProcedureLog.user_id == user.id,
-            ProcedureLog.date >= six_months_ago,
+            ProcedureLog.date >= query_start,
+            ProcedureLog.date <= query_end
         )
         .all()
     )
 
     # Build monthly buckets
     month_labels = []
-    now = datetime.now(timezone.utc)
-    for i in range(5, -1, -1):
-        dt = now - timedelta(days=i * 30)
-        month_labels.append(dt.strftime("%b %Y"))
+    
+    # Normalize start to 1st of month for label generation
+    curr = query_start.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    # Loop until we surpass the end date's month
+    while curr <= query_end:
+        month_labels.append(curr.strftime("%b %Y"))
+        
+        # Advance to next month
+        if curr.month == 12:
+            curr = curr.replace(year=curr.year + 1, month=1)
+        else:
+            curr = curr.replace(month=curr.month + 1)
 
     # Map each log to its month bucket
     month_autonomy_data = defaultdict(lambda: {level.value: 0 for level in AutonomyLevel})
@@ -189,14 +217,14 @@ def get_procedures_by_category(
 @router.post("/gestes/ajouter")
 def add_log(
     request: Request,
-    procedure_id: int = Form(...),
-    autonomy_level: str = Form(...),
+    procedure_ids: list[int] = Form(...),
+    autonomy_levels: list[str] = Form(...),
     date: str = Form(...),
     notes: str = Form(""),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Create a new procedure log entry."""
+    """Create a new procedure log entry (or multiple entries for a case)."""
     # Parse date from the form (DD/MM/YYYY format)
     try:
         log_date = datetime.strptime(date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
@@ -206,28 +234,34 @@ def add_log(
         except ValueError:
             log_date = datetime.now(timezone.utc)
 
-    # Validate autonomy level
-    try:
-        level = AutonomyLevel(autonomy_level)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Niveau d'autonomie invalide.")
+    # Validate that we have matching lists
+    if len(procedure_ids) != len(autonomy_levels):
+        raise HTTPException(status_code=400, detail="Discrepancy between procedures and autonomy levels.")
 
-    # Security check: ensure procedure exists and is accessible by the user's team
-    proc = db.query(Procedure).filter(Procedure.id == procedure_id).first()
-    if not proc:
-        raise HTTPException(status_code=404, detail="Acte non trouvé.")
+    for pid, auto_level in zip(procedure_ids, autonomy_levels):
+        # Validate autonomy level
+        try:
+            level = AutonomyLevel(auto_level)
+        except ValueError:
+            continue # Skip invalid autonomy levels
+
+        # Security check: ensure procedure exists and is accessible by the user's team
+        proc = db.query(Procedure).filter(Procedure.id == pid).first()
+        if not proc:
+            continue # Skip invalid procedure IDs
+        
+        if proc.team_id and proc.team_id != user.team_id:
+            continue # Skip inaccessible procedures
+
+        new_log = ProcedureLog(
+            user_id=user.id,
+            procedure_id=pid,
+            date=log_date,
+            autonomy_level=level,
+            notes=notes if notes else None,
+        )
+        db.add(new_log)
     
-    if proc.team_id and proc.team_id != user.team_id:
-        raise HTTPException(status_code=403, detail="Vous n'avez pas accès à cet acte.")
-
-    new_log = ProcedureLog(
-        user_id=user.id,
-        procedure_id=procedure_id,
-        date=log_date,
-        autonomy_level=level,
-        notes=notes if notes else None,
-    )
-    db.add(new_log)
     db.commit()
 
     return RedirectResponse("/tableau-de-bord", status_code=303)

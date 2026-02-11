@@ -27,18 +27,46 @@
 
             <form method="post" action="/inscription" class="space-y-4"
                 x-data="{ role: 'resident', teamId: '{{ preselected_team_id if preselected_team_id else '' }}' }">
+
+                {% if invitation_token %}
+                <input type="hidden" name="invitation_token" value="{{ invitation_token }}">
+                <input type="hidden" name="role" value="resident">
+                <input type="hidden" name="team_id" value="{{ preselected_team_id }}">
+
+                <div
+                    class="mb-6 p-4 bg-primary-50 text-primary-900 text-sm rounded-xl border border-primary-100 shadow-sm">
+                    <p class="font-bold flex items-center gap-2 mb-1">
+                        <svg class="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Invitation acceptée !
+                    </p>
+                    <p class="text-primary-800">Vous rejoignez l'équipe avec l'email <strong class="font-semibold">{{
+                            preselected_email }}</strong>.</p>
+                    <p class="text-primary-800 mt-2">Veuillez définir votre mot de passe pour finaliser l'inscription.
+                    </p>
+                </div>
+                {% endif %}
+
+                {% if not invitation_token %}
                 <div>
                     <label for="full_name" class="block text-sm font-medium text-gray-600 mb-1">Nom complet</label>
                     <input type="text" id="full_name" name="full_name" required autocomplete="name"
                         class="w-full px-4 py-3 rounded-xl border border-surface-300 bg-surface-50 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-transparent transition text-sm"
                         placeholder="Dr. Prénom Nom">
                 </div>
+                {% endif %}
+
                 <div>
                     <label for="email" class="block text-sm font-medium text-gray-600 mb-1">Email</label>
                     <input type="email" id="email" name="email" required autocomplete="email"
-                        class="w-full px-4 py-3 rounded-xl border border-surface-300 bg-surface-50 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-transparent transition text-sm"
+                        value="{{ preselected_email if preselected_email else '' }}" {% if preselected_email
+                        %}readonly{% endif %}
+                        class="w-full px-4 py-3 rounded-xl border border-surface-300 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-transparent transition text-sm {% if preselected_email %}bg-gray-100 text-gray-500 cursor-not-allowed{% else %}bg-surface-50{% endif %}"
                         placeholder="prenom.nom@hopital.fr">
                 </div>
+
                 <div>
                     <label for="password" class="block text-sm font-medium text-gray-600 mb-1">Mot de passe</label>
                     <input type="password" id="password" name="password" required minlength="6"
@@ -46,6 +74,8 @@
                         class="w-full px-4 py-3 rounded-xl border border-surface-300 bg-surface-50 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-transparent transition text-sm"
                         placeholder="Minimum 6 caractères">
                 </div>
+
+                {% if not invitation_token %}
                 <div>
                     <label class="block text-sm font-medium text-gray-600 mb-2">Rôle</label>
                     <div class="grid grid-cols-2 gap-3">
@@ -95,11 +125,12 @@
                         ⚠️ Seuls les Seniors peuvent créer une équipe. Veuillez sélectionner une équipe existante.
                     </p>
                 </div>
+                {% endif %}
 
                 <div class="pt-2">
                     <button type="submit"
                         class="w-full py-3 px-4 bg-gradient-to-r from-primary-600 to-primary-500 text-white font-semibold rounded-xl hover:from-primary-700 hover:to-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:ring-offset-2 transition-all text-sm shadow-sm">
-                        Créer mon compte
+                        {% if invitation_token %}Finaliser l'inscription{% else %}Créer mon compte{% endif %}
                     </button>
                 </div>
             </form>

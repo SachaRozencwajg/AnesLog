@@ -16,6 +16,7 @@ templates = Jinja2Templates(directory="app/templates")
 @router.get("/profil")
 def profile(
     request: Request,
+    setup: bool = False,
     user: User = Depends(get_current_user),
 ):
     """Render the user profile page."""
@@ -25,12 +26,14 @@ def profile(
             "request": request,
             "user": user,
             "semesters": range(1, 11),  # Semesters 1 to 10
+            "setup_mode": setup,
         },
     )
 
 @router.post("/profil")
 def update_profile(
     request: Request,
+    full_name: str = Form(...),
     semester: int = Form(None),
     start_date: str = Form(None),
     end_date: str = Form(None),
@@ -39,6 +42,10 @@ def update_profile(
     db: Session = Depends(get_db),
 ):
     """Update the user profile."""
+    
+    # Update full name
+    if full_name and full_name.strip():
+        user.full_name = full_name.strip()
     
     # Resident validation
     if user.role.value == "resident":

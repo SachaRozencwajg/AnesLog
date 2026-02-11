@@ -245,55 +245,78 @@
                         class="w-full px-4 py-3 rounded-xl border border-surface-300 bg-surface-50 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-transparent text-sm">
                 </div>
 
-                <!-- Category dropdown -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-600 mb-1">Catégorie</label>
-                    <select name="category_id" x-model="selectedCategory" @change="fetchProcedures()" required
-                        class="w-full px-4 py-3 rounded-xl border border-surface-300 bg-surface-50 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-transparent text-sm appearance-none">
-                        <option value="">— Choisir une catégorie —</option>
-                        {% for cat in categories %}
-                        <option value="{{ cat.id }}">{{ cat.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
+                <!-- Added Procedures List -->
+                <div class="space-y-3">
+                    <label class="block text-sm font-medium text-gray-600">Gestes du cas</label>
 
-                <!-- Procedure dropdown (populated via API) -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-600 mb-1">Geste</label>
-                    <select name="procedure_id" x-model="selectedProcedure" required :disabled="procedures.length === 0"
-                        class="w-full px-4 py-3 rounded-xl border border-surface-300 bg-surface-50 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-transparent text-sm appearance-none disabled:opacity-50">
-                        <option value="">— Choisir un geste —</option>
-                        <template x-for="proc in procedures" :key="proc.id">
-                            <option :value="proc.id" x-text="proc.name"></option>
-                        </template>
-                    </select>
-                </div>
-
-                <!-- Autonomy Level (radio cards for touch-friendly input) -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-600 mb-2">Niveau d'autonomie</label>
-                    <div class="grid grid-cols-1 gap-2">
-                        {% for level in autonomy_levels %}
-                        <label
-                            class="radio-card flex items-center gap-3 p-3 rounded-xl border-2 transition-all cursor-pointer"
-                            :class="selectedAutonomy === {{ level.value|tojson }} ? 'border-primary-500 bg-primary-50' : 'border-surface-200 hover:border-surface-300'"
-                            @click="selectedAutonomy = {{ level.value|tojson }}">
-                            <input type="radio" name="autonomy_level" value="{{ level.value }}"
-                                x-model="selectedAutonomy" class="sr-only" required>
-                            <div class="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold
-                                {% if level.value == 'Je suis autonome' %}bg-green-100 text-green-700
-                                {% elif level.value == 'Je sais faire' %}bg-emerald-100 text-emerald-700
-                                {% elif level.value == " J'ai fait avec aide" %}bg-blue-100 text-blue-700 {% else
-                                %}bg-amber-100 text-amber-700{% endif %}">
-                                {% if level.value == 'Je suis autonome' %}✓
-                                {% elif level.value == 'Je sais faire' %}◉
-                                {% elif level.value == "J'ai fait avec aide" %}◎
-                                {% else %}○{% endif %}
+                    <template x-for="(item, index) in procedureList" :key="index">
+                        <div
+                            class="flex justify-between items-center p-3 bg-white border border-surface-200 rounded-xl shadow-sm">
+                            <div>
+                                <p class="text-sm font-medium text-gray-800" x-text="item.name"></p>
+                                <p class="text-xs text-gray-500" x-text="item.autonomy"></p>
                             </div>
-                            <span class="text-sm font-medium text-gray-700">{{ level.value }}</span>
-                        </label>
-                        {% endfor %}
+                            <button type="button" @click="removeProcedure(index)"
+                                class="text-red-500 hover:text-red-700 p-1">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </button>
+
+                            <!-- Hidden Inputs for Submission -->
+                            <input type="hidden" name="procedure_ids" :value="item.id">
+                            <input type="hidden" name="autonomy_levels" :value="item.autonomy">
+                        </div>
+                    </template>
+
+                    <div x-show="procedureList.length === 0"
+                        class="text-center py-4 bg-surface-50 rounded-xl border border-dashed border-surface-300 text-sm text-gray-500">
+                        Aucun geste ajouté.<br>Ajoutez des gestes ci-dessous.
                     </div>
+                </div>
+
+                <!-- Add Procedure Form Area -->
+                <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-4">
+                    <h3 class="text-sm font-semibold text-gray-700">Ajouter un geste</h3>
+
+                    <!-- Category dropdown -->
+                    <div>
+                        <select x-model="selectedCategory" @change="fetchProcedures()"
+                            class="w-full px-4 py-2.5 rounded-xl border border-surface-300 bg-white focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-transparent text-sm appearance-none">
+                            <option value="">— Catégorie —</option>
+                            {% for cat in categories %}
+                            <option value="{{ cat.id }}">{{ cat.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Procedure dropdown -->
+                    <div>
+                        <select x-model="selectedProcedure" :disabled="procedures.length === 0"
+                            class="w-full px-4 py-2.5 rounded-xl border border-surface-300 bg-white focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-transparent text-sm appearance-none disabled:opacity-50">
+                            <option value="">— Geste —</option>
+                            <template x-for="proc in procedures" :key="proc.id">
+                                <option :value="proc.id" x-text="proc.name"></option>
+                            </template>
+                        </select>
+                    </div>
+
+                    <!-- Autonomy Level -->
+                    <div>
+                        <select x-model="selectedAutonomy"
+                            class="w-full px-4 py-2.5 rounded-xl border border-surface-300 bg-white focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-transparent text-sm appearance-none">
+                            <option value="">— Autonomie —</option>
+                            {% for level in autonomy_levels %}
+                            <option value="{{ level.value }}">{{ level.value }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <button type="button" @click="addProcedure()" :disabled="!selectedProcedure || !selectedAutonomy"
+                        class="w-full py-2 px-4 bg-white border border-primary-200 text-primary-700 font-medium rounded-xl hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-300 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                        + Ajouter au cas
+                    </button>
                 </div>
 
                 <!-- Notes -->
@@ -305,9 +328,9 @@
                 </div>
 
                 <!-- Submit -->
-                <button type="submit" :disabled="!selectedProcedure || !selectedAutonomy"
+                <button type="submit" :disabled="procedureList.length === 0"
                     class="w-full py-3.5 px-4 bg-gradient-to-r from-primary-600 to-primary-500 text-white font-semibold rounded-xl hover:from-primary-700 hover:to-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:ring-offset-2 transition-all text-sm shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
-                    Enregistrer le geste
+                    Enregistrer le cas
                 </button>
             </form>
         </div>
@@ -325,6 +348,7 @@
             selectedProcedure: '',
             selectedAutonomy: '',
             procedures: [],
+            procedureList: [],
             today: new Date().toISOString().split('T')[0],
 
             async fetchProcedures() {
@@ -337,6 +361,26 @@
                 } catch (e) {
                     console.error('Error fetching procedures:', e);
                 }
+            },
+
+            addProcedure() {
+                if (!this.selectedProcedure || !this.selectedAutonomy) return;
+
+                const proc = this.procedures.find(p => p.id == this.selectedProcedure);
+                this.procedureList.push({
+                    id: this.selectedProcedure,
+                    name: proc ? proc.name : 'Geste inconnu',
+                    autonomy: this.selectedAutonomy
+                });
+
+                // Reset fields but keep category for convenience? Or reset all?
+                // User might add multiple KTA/KTC from same category. Keep category.
+                this.selectedProcedure = '';
+                this.selectedAutonomy = '';
+            },
+
+            removeProcedure(index) {
+                this.procedureList.splice(index, 1);
             }
         }
     }
