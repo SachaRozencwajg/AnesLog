@@ -9,59 +9,6 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import User, UserRole, Team, Invitation, InvitationStatus
-
-# ... (imports)
-
-@router.post("/inscription")
-async def register_submit(
-    # ... (args)
-):
-    # ... (validation logic)
-
-    # Team Logic
-    final_team_id = None
-    is_approved_status = False
-
-    if user_role == UserRole.senior:
-        # ... (senior logic)
-        pass # Keep existing logic
-
-    elif user_role == UserRole.resident:
-        # Resident must join existing team
-        if not team_id:
-            teams = db.query(Team).order_by(Team.name).all()
-            return templates.TemplateResponse(
-                "register.html", 
-                {"request": request, "error": "Veuillez sélectionner votre équipe.", "teams": teams}
-            )
-        final_team_id = int(team_id)
-        is_approved_status = False # Pending senior approval
-
-        # Check for invitation to auto-approve
-        invitation = db.query(Invitation).filter(
-            Invitation.email == email,
-            Invitation.team_id == final_team_id,
-            Invitation.status == InvitationStatus.pending
-        ).first()
-
-        if invitation:
-            is_approved_status = True
-            invitation.status = InvitationStatus.accepted
-            # db.add(invitation) # Not needed if object is attached to session, but good practice if new
-
-    # Create user
-    new_user = User(
-        email=email,
-        password_hash=hash_password(password),
-        full_name=full_name,
-        role=user_role,
-        is_active=False,
-        team_id=final_team_id,
-        is_approved=is_approved_status
-    )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
 from app.auth import (
     hash_password, verify_password, create_access_token,
     get_optional_user, create_reset_token, verify_reset_token,
@@ -71,6 +18,8 @@ from app.utils.email import send_email
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
+
+
 
 
 @router.get("/connexion")
@@ -219,6 +168,17 @@ async def register_submit(
             )
         final_team_id = int(team_id)
         is_approved_status = False # Pending senior approval
+
+        # Check for invitation to auto-approve
+        invitation = db.query(Invitation).filter(
+            Invitation.email == email,
+            Invitation.team_id == final_team_id,
+            Invitation.status == InvitationStatus.pending
+        ).first()
+
+        if invitation:
+            is_approved_status = True
+            invitation.status = InvitationStatus.accepted
 
     # Create user
     new_user = User(
