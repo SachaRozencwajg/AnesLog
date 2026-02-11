@@ -51,6 +51,13 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     full_name = Column(String(255), nullable=False)
     role = Column(SAEnum(UserRole), nullable=False, default=UserRole.resident)
+    
+    # Profile fields (for residents)
+    semester = Column(Integer, nullable=True)  # 1-10
+    start_date = Column(DateTime, nullable=True)
+    end_date = Column(DateTime, nullable=True)
+    institution = Column(String(255), nullable=True)
+    
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships

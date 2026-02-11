@@ -14,17 +14,59 @@ from app.models import User, UserRole
 # Create tables on startup
 Base.metadata.create_all(bind=engine)
 
+# Run simple migration for new columns (SQLite specific)
+import sqlite3
+import os
+
+def run_migrations():
+    """Add columns to users table for profile features."""
+    # Only run for SQLite
+    db_url = os.getenv("DATABASE_URL", "sqlite:///./aneslog.db")
+    if "sqlite" not in db_url:
+        return
+
+    db_path = db_url.replace("sqlite:///", "").replace("./", "")
+    if not os.path.exists(db_path):
+        return
+
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        columns = [
+            ("semester", "INTEGER"),
+            ("start_date", "DATETIME"),
+            ("end_date", "DATETIME"),
+            ("institution", "VARCHAR(255)")
+        ]
+        
+        for col_name, col_type in columns:
+            try:
+                cursor.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_type}")
+                print(f"Migration: Added column {col_name}")
+            except sqlite3.OperationalError as e:
+                # Ignore "duplicate column name" error
+                pass
+                
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Migration warning: {e}")
+
+run_migrations()
+
 app = FastAPI(title="AnesLog", description="Carnet de gestes en Anesthésie-Réanimation")
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 # Import and register route modules
-from app.routes import auth_routes, resident_routes, senior_routes
+from app.routes import auth_routes, resident_routes, senior_routes, profile_routes
 
 app.include_router(auth_routes.router)
 app.include_router(resident_routes.router)
 app.include_router(senior_routes.router)
+app.include_router(profile_routes.router)
 
 
 @app.get("/")
