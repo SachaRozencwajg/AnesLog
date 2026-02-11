@@ -8,7 +8,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Run seed script to initialize DB with default data
-RUN python -m app.seed
+# RUN python -m app.seed
 
 EXPOSE 8080
 
