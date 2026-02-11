@@ -35,7 +35,12 @@
                         placeholder="prenom.nom@hopital.fr">
                 </div>
                 <div>
-                    <label for="password" class="block text-sm font-medium text-gray-600 mb-1">Mot de passe</label>
+                    <div class="flex items-center justify-between mb-1">
+                        <label for="password" class="block text-sm font-medium text-gray-600">Mot de passe</label>
+                        <a href="/mot-de-passe-oublie"
+                            class="text-xs font-medium text-primary-600 hover:text-primary-500" tabindex="-1">Mot de
+                            passe oublié ?</a>
+                    </div>
                     <input type="password" id="password" name="password" required autocomplete="current-password"
                         class="w-full px-4 py-3 rounded-xl border border-surface-300 bg-surface-50 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-transparent transition text-sm"
                         placeholder="••••••••">

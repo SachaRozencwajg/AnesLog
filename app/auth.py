@@ -54,6 +54,24 @@ def decode_token(token: str) -> dict | None:
         return None
 
 
+def create_reset_token(email: str) -> str:
+    """Create a password reset token valid for 15 minutes."""
+    expire = datetime.now(timezone.utc) + timedelta(minutes=15)
+    payload = {"sub": email, "type": "reset", "exp": expire}
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def verify_reset_token(token: str) -> str | None:
+    """Verify a reset token and return the email if valid."""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("type") != "reset":
+            return None
+        return payload.get("sub")
+    except JWTError:
+        return None
+
+
 # ---------------------------------------------------------------------------
 # FastAPI dependencies
 # ---------------------------------------------------------------------------
