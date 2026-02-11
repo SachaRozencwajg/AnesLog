@@ -43,6 +43,20 @@ class AutonomyLevel(str, enum.Enum):
 # Models
 # ---------------------------------------------------------------------------
 
+class Team(Base):
+    """
+    Medical team (e.g. "Marie Lannelongue - Anesthésie").
+    """
+    __tablename__ = "teams"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), unique=True, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    # Relationships
+    users = relationship("User", back_populates="team")
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -52,6 +66,11 @@ class User(Base):
     full_name = Column(String(255), nullable=False)
     role = Column(SAEnum(UserRole), nullable=False, default=UserRole.resident)
     
+    # Team Relationship
+    team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)
+    is_approved = Column(Boolean, default=False) # True if request accepted by senior
+    team = relationship("Team", back_populates="users")
+
     # Profile fields (for residents)
     semester = Column(Integer, nullable=True)  # 1-10
     start_date = Column(DateTime, nullable=True)

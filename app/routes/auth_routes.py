@@ -8,7 +8,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import User, UserRole
+from app.models import User, UserRole, Team
 from app.auth import (
     hash_password, verify_password, create_access_token,
     get_optional_user, create_reset_token, verify_reset_token,
@@ -39,13 +39,20 @@ def login_submit(
             {"request": request, "error": "Email ou mot de passe incorrect."}
         )
     
-    # Check if active
+    # Check if active (email verified)
     if not user.is_active:
          return templates.TemplateResponse(
             "login.html",
             {"request": request, "error": "Veuillez confirmer votre email avant de vous connecter."}
         )
 
+    # Check if approved (team validation)
+    if not user.is_approved:
+        return templates.TemplateResponse(
+            "login.html",
+            {"request": request, "error": "Votre compte est en attente de validation par un senior de l'équipe."}
+        )
+    
     # Create session
     access_token = create_access_token(user.id, user.role.value)
     
@@ -67,8 +74,9 @@ def login_submit(
 
 
 @router.get("/inscription")
-def register_page(request: Request):
-    return templates.TemplateResponse("register.html", {"request": request})
+def register_page(request: Request, db: Session = Depends(get_db)):
+    teams = db.query(Team).order_by(Team.name).all()
+    return templates.TemplateResponse("register.html", {"request": request, "teams": teams})
 
 
 @router.post("/inscription")
@@ -79,32 +87,84 @@ async def register_submit(
     email: str = Form(...),
     password: str = Form(...),
     role: str = Form(...),
+    team_id: str = Form(None),
+    new_team_name: str = Form(None),
     db: Session = Depends(get_db),
 ):
-    # Check existing
+    # Check existing email
     existing_user = db.query(User).filter(User.email == email).first()
     if existing_user:
+        teams = db.query(Team).order_by(Team.name).all()
         return templates.TemplateResponse(
             "register.html",
-            {"request": request, "error": "Cet email est déjà utilisé."}
+            {"request": request, "error": "Cet email est déjà utilisé.", "teams": teams}
         )
 
     # Validate role
     try:
         user_role = UserRole(role)
     except ValueError:
+        teams = db.query(Team).order_by(Team.name).all()
         return templates.TemplateResponse(
             "register.html",
-            {"request": request, "error": "Rôle invalide."}
+            {"request": request, "error": "Rôle invalide.", "teams": teams}
         )
 
-    # Create inactive user
+    # Team Logic
+    final_team_id = None
+    is_approved_status = False
+
+    if user_role == UserRole.senior:
+        # Senior is auto-approved in the team they create/join (simplification)
+        is_approved_status = True
+        
+        if new_team_name and new_team_name.strip():
+            # Create new team
+            existing_team = db.query(Team).filter(Team.name == new_team_name.strip()).first()
+            if existing_team:
+                teams = db.query(Team).order_by(Team.name).all()
+                return templates.TemplateResponse(
+                    "register.html",
+                    {"request": request, "error": "Une équipe avec ce nom existe déjà.", "teams": teams}
+                )
+            
+            new_team = Team(name=new_team_name.strip())
+            db.add(new_team)
+            db.commit()
+            db.refresh(new_team)
+            final_team_id = new_team.id
+            
+        elif team_id:
+            # Join existing team
+            final_team_id = team_id
+        else:
+            # Did not select or create
+            teams = db.query(Team).order_by(Team.name).all()
+            return templates.TemplateResponse(
+                "register.html",
+                {"request": request, "error": "Veuillez sélectionner une équipe ou en créer une.", "teams": teams}
+            )
+
+    elif user_role == UserRole.resident:
+        # Resident must join existing team
+        if not team_id:
+            teams = db.query(Team).order_by(Team.name).all()
+            return templates.TemplateResponse(
+                "register.html",
+                {"request": request, "error": "Veuillez sélectionner votre équipe.", "teams": teams}
+            )
+        final_team_id = team_id
+        is_approved_status = False # Pending senior approval
+
+    # Create user
     new_user = User(
         email=email,
         password_hash=hash_password(password),
         full_name=full_name,
         role=user_role,
-        is_active=False
+        is_active=False,
+        team_id=final_team_id,
+        is_approved=is_approved_status
     )
     db.add(new_user)
     db.commit()
@@ -112,12 +172,7 @@ async def register_submit(
 
     # Generate verification link
     token = create_verification_token(email)
-    # Ensure scheme is https in production (Cloud Run handles this via X-Forwarded-Proto but request.url might be http if behind proxy)
-    # Start URL construction
     base_url = str(request.base_url).rstrip("/")
-    # Force HTTPS if obviously running on cloud run (can check env vars, but simpler to rely on request)
-    # request.url.scheme might be http locally.
-    
     verify_link = f"{base_url}/verifier-email?token={token}"
 
     # Prepare Email
@@ -128,32 +183,30 @@ async def register_submit(
         <body style="font-family: Arial, sans-serif; color: #333;">
             <h2>Bienvenue Dr. {full_name} !</h2>
             <p>Votre compte Senior a été créé sur AnesLog.</p>
-            <p>Vous pourrez bientôt superviser la progression de vos internes et valider leurs acquis.</p>
+            <p>Vous avez rejoint l'équipe.</p>
             <p><strong>Action requise :</strong> Pour activer votre compte, veuillez cliquer sur le lien ci-dessous :</p>
             <p style="text-align: center; margin: 20px 0;">
                 <a href="{verify_link}" style="background-color: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Confirmer mon email</a>
             </p>
-            <p>Ce lien est valide pendant 24 heures.</p>
-            <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-            <p style="font-size: 12px; color: #666;">Si le bouton ne fonctionne pas, copiez ce lien : {verify_link}</p>
         </body>
         </html>
         """
     else:
         subject = "Bienvenue sur AnesLog - Confirmez votre compte"
+        # Can fetch team name for email
+        team_obj = db.query(Team).get(final_team_id)
+        team_name = team_obj.name if team_obj else "votre équipe"
+        
         body = f"""
         <html>
         <body style="font-family: Arial, sans-serif; color: #333;">
             <h2>Bienvenue {full_name} !</h2>
-            <p>Votre compte Résident a été créé sur AnesLog.</p>
-            <p>Vous pourrez bientôt enregistrer vos gestes techniques et suivre votre progression.</p>
-            <p><strong>Action requise :</strong> Pour activer votre compte, veuillez cliquer sur le lien ci-dessous :</p>
+            <p>Votre demande pour rejoindre l'équipe <strong>{team_name}</strong> a été enregistrée.</p>
+            <p>Une fois votre email confirmé, un Senior de l'équipe devra valider votre demande.</p>
+            <p><strong>Action requise :</strong> Pour confirmer votre email, veuillez cliquer sur le lien ci-dessous :</p>
             <p style="text-align: center; margin: 20px 0;">
                 <a href="{verify_link}" style="background-color: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Confirmer mon email</a>
             </p>
-            <p>Ce lien est valide pendant 24 heures.</p>
-            <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-            <p style="font-size: 12px; color: #666;">Si le bouton ne fonctionne pas, copiez ce lien : {verify_link}</p>
         </body>
         </html>
         """

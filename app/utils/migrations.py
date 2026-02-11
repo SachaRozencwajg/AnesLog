@@ -23,17 +23,57 @@ def run_postgres_migrations():
             if not result.fetchone():
                 print("Migration: Adding 'is_active' column to users table.")
                 
-                # 1. Add column with default FALSE (or TRUE to be safe for intermediate state? No, Postgres handles default)
+                # 1. Add column
                 conn.execute(text("ALTER TABLE users ADD COLUMN is_active BOOLEAN DEFAULT FALSE;"))
-                
-                # 2. Activate ALL existing users so they don't get locked out
+                # 2. Activate existing
                 conn.execute(text("UPDATE users SET is_active = TRUE;"))
+                conn.commit()
+                print("Migration: 'is_active' column added.")
+
+            # Check teams table
+            try:
+                conn.execute(text("SELECT 1 FROM teams LIMIT 1;"))
+            except Exception:
+                print("Migration: Creating teams table.")
+                # We are inside a transaction? explicitly commit previous or use begin?
+                # engine.connect() creates a connection. Default not autocommit.
+                # If exception happened (table undefined), transaction might be aborted.
+                # So we catch specific DBAPIError or just proceed if we assume it doesn't exist?
+                # With 'create table if not exists' inside a raw SQL we avoid check.
+                pass
+            
+            # Safe CREATE TABLE IF NOT EXISTS
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS teams (
+                    id SERIAL PRIMARY KEY,
+                    name VARCHAR(255) UNIQUE NOT NULL,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                );
+            """))
+            conn.commit()
+
+            # Check users.team_id
+            result = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name='team_id';"))
+            if not result.fetchone():
+                print("Migration: Adding team columns to users.")
+                conn.execute(text("ALTER TABLE users ADD COLUMN team_id INTEGER REFERENCES teams(id);"))
+                conn.execute(text("ALTER TABLE users ADD COLUMN is_approved BOOLEAN DEFAULT FALSE;"))
                 
-                # 3. Ensure future users default to FALSE (handled by ALTER ADD DEFAULT, but ensure it sticks)
-                # The ALTER ADD ... DEFAULT FALSE sets the default metadata.
+                # SEED LOGIC
+                print("Migration: Seeding initial team.")
+                conn.execute(text("INSERT INTO teams (name) VALUES ('Marie Lannelongue - Anesthésie') ON CONFLICT (name) DO NOTHING;"))
+                
+                # Assign users
+                res = conn.execute(text("SELECT id FROM teams WHERE name = 'Marie Lannelongue - Anesthésie';"))
+                team_row = res.fetchone()
+                if team_row:
+                    team_id = team_row[0]
+                    target_emails = ['srozencwajg@ghpsj.fr', 'jupo9809@gmail.com', 'sacha.rozencwajg@gmail.com']
+                    for email in target_emails:
+                        conn.execute(text(f"UPDATE users SET team_id = {team_id}, is_approved = TRUE WHERE email = '{email}';"))
                 
                 conn.commit()
-                print("Migration: 'is_active' column added and existing users activated.")
+                print("Migration: Team seed complete.")
             else:
                 print("Migration: 'is_active' column already exists.")
 
