@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Équipe — AnesLog{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 sm:px-6 py-6">
+
+    <!-- Header -->
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold text-primary-900">Vue d'équipe</h1>
+        <p class="text-sm text-gray-500 mt-1">{{ resident_stats|length }} interne{{ 's' if resident_stats|length > 1
+            else '' }} supervisé{{ 's' if resident_stats|length > 1 else '' }}</p>
+    </div>
+
+    {% if resident_stats %}
+    <!-- Desktop table view -->
+    <div class="bg-white rounded-2xl border border-surface-200 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b border-surface-100">
+                        <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-4">
+                            Interne</th>
+                        <th class="text-center text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-4">
+                            Total gestes</th>
+                        <th class="text-center text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-4">
+                            Autonomes</th>
+                        <th
+                            class="text-center text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-4 hidden sm:table-cell">
+                            Dernier geste</th>
+                        <th class="text-right text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-4">
+                            Action</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-surface-100">
+                    {% for stat in resident_stats %}
+                    <tr class="hover:bg-surface-50 transition">
+                        <td class="px-6 py-4">
+                            <div class="flex items-center gap-3">
+                                <div
+                                    class="w-9 h-9 bg-gradient-to-br from-primary-100 to-primary-200 rounded-xl flex items-center justify-center">
+                                    <span class="text-sm font-bold text-primary-700">{{ stat.user.full_name[0] }}</span>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-medium text-gray-800">{{ stat.user.full_name }}</p>
+                                    <p class="text-xs text-gray-400">{{ stat.user.email }}</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <span class="text-lg font-bold text-gray-800">{{ stat.total_logs }}</span>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <span
+                                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium badge-autonomous">
+                                ✓ {{ stat.autonomous_count }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-center hidden sm:table-cell">
+                            {% if stat.last_log_date %}
+                            <span class="text-sm text-gray-600">{{ stat.last_log_date.strftime('%d/%m/%Y') }}</span>
+                            {% else %}
+                            <span class="text-xs text-gray-400">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            <a href="/equipe/{{ stat.user.id }}"
+                                class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary-600 bg-primary-50 rounded-lg hover:bg-primary-100 transition">
+                                Détails
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M9 5l7 7-7 7" />
+                                </svg>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="bg-white rounded-2xl border border-surface-200 p-10 text-center">
+        <div class="w-14 h-14 bg-surface-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <svg class="w-7 h-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+        </div>
+        <p class="text-sm text-gray-500">Aucun interne inscrit pour le moment.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

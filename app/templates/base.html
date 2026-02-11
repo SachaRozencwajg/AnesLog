@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}AnesLog{% endblock %}</title>
+    <meta name="description" content="Carnet de gestes en Anesthésie-Réanimation">
+
+    <!-- TailwindCSS Play CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: { 50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 300: '#93c5fd', 400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 800: '#1e40af', 900: '#1e3a5f' },
+                        medical: { light: '#f0f9ff', DEFAULT: '#0369a1', dark: '#0c4a6e', accent: '#06b6d4' },
+                        surface: { 50: '#f8fafc', 100: '#f1f5f9', 200: '#e2e8f0', 300: '#cbd5e1' },
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <!-- Chart.js (used on senior detail page) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+
+    <!-- Inter font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="/static/css/custom.css">
+</head>
+<body class="bg-surface-50 font-sans text-gray-800 min-h-screen flex flex-col">
+
+    <!-- Navigation -->
+    {% if user %}
+    <nav class="bg-white border-b border-surface-200 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6">
+            <div class="flex items-center justify-between h-16">
+                <!-- Logo -->
+                <a href="/" class="flex items-center gap-2">
+                    <div class="w-8 h-8 bg-gradient-to-br from-primary-500 to-medical-accent rounded-lg flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                    </div>
+                    <span class="text-lg font-bold text-primary-900">AnesLog</span>
+                </a>
+
+                <!-- Nav links -->
+                <div class="flex items-center gap-1 sm:gap-3">
+                    {% if user.role.value == 'resident' %}
+                    <a href="/tableau-de-bord" class="nav-link px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-primary-600 hover:bg-primary-50 transition-all">
+                        Tableau de bord
+                    </a>
+                    <a href="/mon-carnet" class="nav-link px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-primary-600 hover:bg-primary-50 transition-all">
+                        Mon carnet
+                    </a>
+                    {% else %}
+                    <a href="/equipe" class="nav-link px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-primary-600 hover:bg-primary-50 transition-all">
+                        Équipe
+                    </a>
+                    {% endif %}
+
+                    <!-- User menu -->
+                    <div class="flex items-center gap-2 ml-2 pl-3 border-l border-surface-200">
+                        <div class="hidden sm:block text-right">
+                            <p class="text-sm font-medium text-gray-700">{{ user.full_name }}</p>
+                            <p class="text-xs text-gray-400">{{ 'Senior' if user.role.value == 'senior' else 'Interne' }}</p>
+                        </div>
+                        <a href="/deconnexion" class="p-2 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-all" title="Déconnexion">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                            </svg>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+    {% endif %}
+
+    <!-- Main content -->
+    <main class="flex-1">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-surface-200 py-4 mt-auto">
+        <div class="max-w-7xl mx-auto px-4 text-center text-xs text-gray-400">
+            AnesLog &copy; 2026 — Carnet de gestes en Anesthésie-Réanimation
+        </div>
+    </footer>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

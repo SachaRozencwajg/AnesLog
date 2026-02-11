@@ -1,0 +1,72 @@
+/* AnesLog – Custom overrides for Clean Medical aesthetic */
+
+/* Smooth transitions for interactive elements */
+* { -webkit-tap-highlight-color: transparent; }
+
+/* Active nav link highlight */
+.nav-link.active {
+    color: #2563eb;
+    background-color: #eff6ff;
+}
+
+/* FAB button pulse animation */
+@keyframes pulse-ring {
+    0% { transform: scale(0.9); opacity: 0.7; }
+    50% { transform: scale(1.1); opacity: 0; }
+    100% { transform: scale(0.9); opacity: 0; }
+}
+
+.fab-pulse::before {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    background: rgba(59, 130, 246, 0.3);
+    animation: pulse-ring 2s ease-out infinite;
+}
+
+/* Modal backdrop animation */
+.modal-backdrop {
+    transition: opacity 0.2s ease;
+}
+
+/* Card hover lift */
+.card-hover {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.08);
+}
+
+/* Progress bar animation */
+.progress-bar {
+    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Autonomy level badge colors */
+.badge-observed { background: #fef3c7; color: #92400e; }
+.badge-assisted { background: #dbeafe; color: #1e40af; }
+.badge-capable { background: #d1fae5; color: #065f46; }
+.badge-autonomous { background: #dcfce7; color: #14532d; border: 1px solid #86efac; }
+
+/* Radio button as card (for touch-friendly autonomy selection) */
+.radio-card {
+    transition: all 0.15s ease;
+    cursor: pointer;
+    user-select: none;
+}
+.radio-card:active {
+    transform: scale(0.98);
+}
+.radio-card.selected {
+    border-color: #3b82f6;
+    background-color: #eff6ff;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }

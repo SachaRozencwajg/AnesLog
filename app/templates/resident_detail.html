@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+{% block title %}{{ resident.full_name }} — AnesLog{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 sm:px-6 py-6">
+
+    <!-- Back link & header -->
+    <a href="/equipe"
+        class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-primary-600 transition mb-4">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+        </svg>
+        Retour à l'équipe
+    </a>
+
+    <div class="flex items-center gap-4 mb-6">
+        <div
+            class="w-14 h-14 bg-gradient-to-br from-primary-100 to-primary-200 rounded-2xl flex items-center justify-center">
+            <span class="text-xl font-bold text-primary-700">{{ resident.full_name[0] }}</span>
+        </div>
+        <div>
+            <h1 class="text-xl font-bold text-primary-900">{{ resident.full_name }}</h1>
+            <p class="text-sm text-gray-500">{{ resident.email }} · {{ logs|length }} geste{{ 's' if logs|length > 1
+                else '' }}</p>
+        </div>
+    </div>
+
+    <!-- Charts grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        <!-- Category distribution chart -->
+        <div class="bg-white rounded-2xl p-5 border border-surface-200">
+            <h2 class="text-sm font-semibold text-gray-700 mb-4">Répartition par catégorie</h2>
+            <div class="aspect-[4/3]">
+                <canvas id="categoryChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Autonomy distribution chart -->
+        <div class="bg-white rounded-2xl p-5 border border-surface-200">
+            <h2 class="text-sm font-semibold text-gray-700 mb-4">Niveaux d'autonomie</h2>
+            <div class="aspect-[4/3]">
+                <canvas id="autonomyChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Logbook table -->
+    <div class="bg-white rounded-2xl border border-surface-200 overflow-hidden">
+        <div class="px-6 py-4 border-b border-surface-100">
+            <h2 class="text-sm font-semibold text-gray-700">Carnet détaillé</h2>
+        </div>
+        {% if logs %}
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b border-surface-100 bg-surface-50/50">
+                        <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">
+                            Date</th>
+                        <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">
+                            Catégorie</th>
+                        <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">
+                            Geste</th>
+                        <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">
+                            Autonomie</th>
+                        <th
+                            class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3 hidden md:table-cell">
+                            Notes</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-surface-100">
+                    {% for log in logs %}
+                    <tr class="hover:bg-surface-50 transition">
+                        <td class="px-6 py-3 text-sm text-gray-600 whitespace-nowrap">{{ log.date.strftime('%d/%m/%Y')
+                            }}</td>
+                        <td class="px-6 py-3 text-sm text-gray-500">{{ log.procedure.category.name }}</td>
+                        <td class="px-6 py-3 text-sm font-medium text-gray-800">{{ log.procedure.name }}</td>
+                        <td class="px-6 py-3">
+                            <span class="text-xs px-2 py-1 rounded-full
+                                {% if log.autonomy_level.value == 'Je suis autonome' %}badge-autonomous
+                                {% elif log.autonomy_level.value == 'Je sais faire' %}badge-capable
+                                {% elif log.autonomy_level.value == " J'ai fait avec aide" %}badge-assisted {% else
+                                %}badge-observed{% endif %}">
+                                {{ log.autonomy_level.value }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-3 text-xs text-gray-400 hidden md:table-cell max-w-xs truncate">{{ log.notes
+                            or '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="p-10 text-center">
+            <p class="text-sm text-gray-400">Aucun geste enregistré par cet interne.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Category distribution bar chart
+        const catLabels = {{ category_labels| tojson
+    }};
+    const catCounts = {{ category_counts| tojson }};
+
+    if (catLabels.length > 0) {
+        new Chart(document.getElementById('categoryChart'), {
+            type: 'bar',
+            data: {
+                labels: catLabels,
+                datasets: [{
+                    label: 'Nombre de gestes',
+                    data: catCounts,
+                    backgroundColor: [
+                        'rgba(59, 130, 246, 0.7)',
+                        'rgba(6, 182, 212, 0.7)',
+                        'rgba(16, 185, 129, 0.7)',
+                        'rgba(245, 158, 11, 0.7)',
+                        'rgba(139, 92, 246, 0.7)',
+                    ],
+                    borderRadius: 8,
+                    borderSkipped: false,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#f1f5f9' } },
+                    x: { grid: { display: false }, ticks: { font: { size: 11 } } }
+                }
+            }
+        });
+    }
+
+    // Autonomy distribution doughnut chart
+    const autonomyData = {{ autonomy_dict| tojson }};
+    const autonomyLabels = Object.keys(autonomyData);
+    const autonomyCounts = Object.values(autonomyData);
+
+    if (autonomyCounts.some(v => v > 0)) {
+        new Chart(document.getElementById('autonomyChart'), {
+            type: 'doughnut',
+            data: {
+                labels: autonomyLabels,
+                datasets: [{
+                    data: autonomyCounts,
+                    backgroundColor: [
+                        'rgba(245, 158, 11, 0.8)',
+                        'rgba(59, 130, 246, 0.8)',
+                        'rgba(16, 185, 129, 0.8)',
+                        'rgba(34, 197, 94, 0.9)',
+                    ],
+                    borderWidth: 0,
+                    spacing: 2,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '60%',
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { font: { size: 11 }, padding: 12, usePointStyle: true, pointStyleWidth: 8 }
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

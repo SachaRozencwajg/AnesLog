@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}Mon carnet — AnesLog{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-6 pb-24" x-data="logbookApp()">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 class="text-xl font-bold text-primary-900">Mon carnet</h1>
+            <p class="text-sm text-gray-500">{{ logs|length }} geste{{ 's' if logs|length > 1 else '' }} enregistré{{
+                's' if logs|length > 1 else '' }}</p>
+        </div>
+    </div>
+
+    <!-- Log list -->
+    {% if logs %}
+    <div class="space-y-3">
+        {% for log in logs %}
+        <div class="bg-white rounded-2xl border border-surface-200 overflow-hidden card-hover"
+            x-data="{ editing: false }">
+
+            <!-- Normal view -->
+            <div x-show="!editing" class="p-4">
+                <div class="flex items-start gap-3">
+                    <div class="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0
+                        {% if log.autonomy_level.value == 'Je suis autonome' %}bg-green-100 text-green-700
+                        {% elif log.autonomy_level.value == 'Je sais faire' %}bg-emerald-100 text-emerald-700
+                        {% elif log.autonomy_level.value == " J'ai fait avec aide" %}bg-blue-100 text-blue-700 {% else
+                        %}bg-amber-100 text-amber-700{% endif %}">
+                        {% if log.autonomy_level.value == 'Je suis autonome' %}✓
+                        {% elif log.autonomy_level.value == 'Je sais faire' %}◉
+                        {% elif log.autonomy_level.value == "J'ai fait avec aide" %}◎
+                        {% else %}○{% endif %}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-semibold text-gray-800">{{ log.procedure.name }}</p>
+                        <p class="text-xs text-gray-400 mt-0.5">{{ log.procedure.category.name }} · {{
+                            log.date.strftime('%d/%m/%Y') }}</p>
+                        {% if log.notes %}
+                        <p class="text-xs text-gray-500 mt-1.5 bg-surface-50 p-2 rounded-lg">{{ log.notes }}</p>
+                        {% endif %}
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <span class="hidden sm:inline text-xs px-2 py-1 rounded-full
+                            {% if log.autonomy_level.value == 'Je suis autonome' %}badge-autonomous
+                            {% elif log.autonomy_level.value == 'Je sais faire' %}badge-capable
+                            {% elif log.autonomy_level.value == " J'ai fait avec aide" %}badge-assisted {% else
+                            %}badge-observed{% endif %}">
+                            {{ log.autonomy_level.value }}
+                        </span>
+                        <button @click="editing = true"
+                            class="p-1.5 text-gray-400 hover:text-primary-600 rounded-lg hover:bg-primary-50 transition"
+                            title="Modifier">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
+                        </button>
+                        <form method="post" action="/gestes/{{ log.id }}/supprimer"
+                            onsubmit="return confirm('Supprimer ce geste ?')">
+                            <button type="submit"
+                                class="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition"
+                                title="Supprimer">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Edit view -->
+            <div x-show="editing" x-cloak class="p-4 bg-primary-50/30">
+                <form method="post" action="/gestes/{{ log.id }}/modifier" class="space-y-3">
+                    <div class="flex items-center justify-between mb-1">
+                        <h3 class="text-sm font-semibold text-gray-700">Modifier · {{ log.procedure.name }}</h3>
+                        <button type="button" @click="editing = false"
+                            class="text-xs text-gray-500 hover:text-gray-700">Annuler</button>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Date</label>
+                        <input type="date" name="date" value="{{ log.date.strftime('%Y-%m-%d') }}" required
+                            class="w-full px-3 py-2 rounded-lg border border-surface-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-300">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Niveau d'autonomie</label>
+                        <select name="autonomy_level" required
+                            class="w-full px-3 py-2 rounded-lg border border-surface-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-300">
+                            {% for level in autonomy_levels %}
+                            <option value="{{ level.value }}" {% if level.value==log.autonomy_level.value %}selected{%
+                                endif %}>{{ level.value }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Notes</label>
+                        <textarea name="notes" rows="2"
+                            class="w-full px-3 py-2 rounded-lg border border-surface-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-300 resize-none">{{ log.notes or '' }}</textarea>
+                    </div>
+                    <button type="submit"
+                        class="w-full py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition">
+                        Enregistrer les modifications
+                    </button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="bg-white rounded-2xl border border-surface-200 p-10 text-center">
+        <div class="w-14 h-14 bg-surface-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <svg class="w-7 h-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+        </div>
+        <p class="text-sm text-gray-500">Votre carnet est vide.</p>
+        <p class="text-xs text-gray-400 mt-1">Appuyez sur <strong>+</strong> depuis le tableau de bord pour ajouter un
+            geste.</p>
+    </div>
+    {% endif %}
+
+    <!-- FAB (same as dashboard for quick logging) -->
+    <a href="/tableau-de-bord"
+        class="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-br from-primary-500 to-primary-600 text-white rounded-full shadow-lg shadow-primary-300/40 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform z-50">
+        <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
+        </svg>
+    </a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function logbookApp() {
+        return {}
+    }
+</script>
+{% endblock %}
