@@ -1,0 +1,15 @@
+{% extends "base_auth.html" %}
+
+{% block title %}Vérifiez votre email - AnesLog{% endblock %}
+
+{% block content %}
+<div class="text-center">
+    <h2 class="text-2xl font-bold mb-4">Vérifiez votre email</h2>
+    <p class="mb-4">Un lien de confirmation a été envoyé à <strong>{{ email }}</strong>.</p>
+    <p class="mb-6">Veuillez cliquer sur ce lien (valable 24h) pour activer votre compte.</p>
+    <div class="text-sm text-gray-600">
+        <p>Si vous ne recevez rien, vérifiez vos spams.</p>
+        <p><a href="/connexion" class="text-blue-600 hover:underline">Retour à la connexion</a></p>
+    </div>
+</div>
+{% endblock %}

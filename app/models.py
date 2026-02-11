@@ -11,7 +11,7 @@ import enum
 from datetime import datetime, timezone
 
 from sqlalchemy import (
-    Column, Integer, String, Text, DateTime, ForeignKey, Enum as SAEnum
+    Column, Integer, String, Text, DateTime, ForeignKey, Enum as SAEnum, Boolean
 )
 from sqlalchemy.orm import relationship
 
@@ -58,6 +58,7 @@ class User(Base):
     end_date = Column(DateTime, nullable=True)
     institution = Column(String(255), nullable=True)
     
+    is_active = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships

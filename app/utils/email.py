@@ -22,7 +22,8 @@ def send_email(subject: str, recipients: List[str], html_body: str):
 
     try:
         msg = MIMEMultipart()
-        msg['From'] = MAIL_FROM
+        # Use a friendly display name
+        msg['From'] = f"AnesLog <{MAIL_FROM}>"
         msg['To'] = ", ".join(recipients)
         msg['Subject'] = subject
 

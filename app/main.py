@@ -37,13 +37,16 @@ def run_migrations():
             ("semester", "INTEGER"),
             ("start_date", "DATETIME"),
             ("end_date", "DATETIME"),
-            ("institution", "VARCHAR(255)")
+            ("institution", "VARCHAR(255)"),
+            ("is_active", "BOOLEAN DEFAULT 0")
         ]
         
         for col_name, col_type in columns:
             try:
                 cursor.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_type}")
                 print(f"Migration: Added column {col_name}")
+                if col_name == "is_active":
+                    cursor.execute("UPDATE users SET is_active = 1")
             except sqlite3.OperationalError as e:
                 # Ignore "duplicate column name" error
                 pass
@@ -54,6 +57,13 @@ def run_migrations():
         print(f"Migration warning: {e}")
 
 run_migrations()
+
+# Run Postgres migrations (Cloud Run)
+try:
+    from app.utils.migrations import run_postgres_migrations
+    run_postgres_migrations()
+except Exception as e:
+    print(f"Skipping Postgres migration: {e}")
 
 app = FastAPI(title="AnesLog", description="Carnet de gestes en Anesthésie-Réanimation")
 

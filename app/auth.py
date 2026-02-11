@@ -72,6 +72,24 @@ def verify_reset_token(token: str) -> str | None:
         return None
 
 
+def create_verification_token(email: str) -> str:
+    """Create an email verification token valid for 24 hours."""
+    expire = datetime.now(timezone.utc) + timedelta(hours=24)
+    payload = {"sub": email, "type": "verification", "exp": expire}
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def verify_verification_token(token: str) -> str | None:
+    """Verify a verification token and return the email if valid."""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("type") != "verification":
+            return None
+        return payload.get("sub")
+    except JWTError:
+        return None
+
+
 # ---------------------------------------------------------------------------
 # FastAPI dependencies
 # ---------------------------------------------------------------------------
