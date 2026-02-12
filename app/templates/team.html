@@ -7,7 +7,7 @@
     <!-- Header -->
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
-            <h1 class="text-2xl font-bold text-primary-900">Vue d'équipe</h1>
+            <h1 class="text-2xl font-bold text-primary-900">Mes internes</h1>
             <p class="text-sm text-gray-500 mt-1">{{ resident_stats|length }} interne{{ 's' if resident_stats|length > 1
                 else '' }} supervisé{{ 's' if resident_stats|length > 1 else '' }}</p>
         </div>
@@ -20,7 +20,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                     d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
             </svg>
-            Gérer les actes
+            Configuration de l'équipe
         </a>
     </div>
 
@@ -50,33 +50,33 @@
     {% if resident_stats and averages %}
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
         <div class="bg-white p-4 rounded-2xl border border-surface-200 shadow-sm">
-            <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Total Groupe</h3>
+            <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Total Actes</h3>
             <div class="flex items-baseline gap-2">
                 <span class="text-2xl font-bold text-primary-900">{{ averages.total_group_cases }}</span>
             </div>
         </div>
         <div class="bg-white p-4 rounded-2xl border border-surface-200 shadow-sm">
-            <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Moyenne Globale</h3>
+            <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Moyenne / Interne</h3>
             <div class="flex items-baseline gap-2">
                 <span class="text-2xl font-bold text-gray-900">{{ averages.cases }}</span>
             </div>
         </div>
         <div class="bg-white p-4 rounded-2xl border border-surface-200 shadow-sm">
-            <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Moyenne Cardio</h3>
+            <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Moy. Cardiaque</h3>
             <div class="flex items-baseline gap-2">
                 <span class="text-2xl font-bold text-rose-600">{{ averages.cardio }}</span>
             </div>
         </div>
         <div class="bg-white p-4 rounded-2xl border border-surface-200 shadow-sm">
-            <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Moyenne Thoracique</h3>
+            <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Moy. Thoracique</h3>
             <div class="flex items-baseline gap-2">
                 <span class="text-2xl font-bold text-blue-600">{{ averages.thoracic }}</span>
             </div>
         </div>
         <div class="bg-white p-4 rounded-2xl border border-surface-200 shadow-sm">
-            <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Autonomie Moy.</h3>
+            <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Moy. Vasculaire</h3>
             <div class="flex items-baseline gap-2">
-                <span class="text-2xl font-bold text-teal-600">{{ averages.autonomy }}%</span>
+                <span class="text-2xl font-bold text-purple-600">{{ averages.vascular }}</span>
             </div>
         </div>
     </div>
@@ -126,73 +126,7 @@
     </div>
     {% endif %}
 
-    <!-- Invite Residents -->
-    <div class="mb-8 p-6 bg-white border border-surface-200 rounded-2xl shadow-sm">
-        <div class="flex items-center gap-2 mb-4">
-            <svg class="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-            </svg>
-            <h2 class="text-lg font-bold text-gray-900">Inviter des internes</h2>
-        </div>
-        <p class="text-sm text-gray-500 mb-4">Envoyez une invitation par email. Les internes recevront un lien pour
-            créer leur compte et rejoindre l'équipe automatiquement.</p>
 
-        <form action="/equipe/invite" method="post" class="flex flex-col sm:flex-row gap-3">
-            <input type="text" name="email_list" required
-                placeholder="Emails séparés par des virgules (ex: a@chu.fr, b@chu.fr)"
-                class="flex-1 px-4 py-2.5 rounded-xl border border-surface-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm">
-            <button type="submit"
-                class="px-6 py-2.5 bg-primary-600 text-white font-medium rounded-xl hover:bg-primary-700 transition shadow-sm whitespace-nowrap">
-                Envoyer les invitations
-            </button>
-        </form>
-    </div>
-
-    <!-- Pending Invitations -->
-    {% if pending_invitations %}
-    <div class="mb-8 p-6 bg-white border border-surface-200 rounded-2xl shadow-sm">
-        <div class="flex items-center gap-2 mb-4">
-            <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            <h2 class="text-lg font-bold text-gray-900">Invitations envoyées</h2>
-        </div>
-        <div class="overflow-hidden border border-gray-100 rounded-xl">
-            <table class="w-full text-left">
-                <thead class="bg-gray-50 border-b border-gray-100">
-                    <tr>
-                        <th class="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Email</th>
-                        <th class="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Date d'envoi
-                        </th>
-                        <th class="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">
-                            Action</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-50 bg-white">
-                    {% for invite in pending_invitations %}
-                    <tr class="hover:bg-gray-50 transition-colors">
-                        <td class="px-4 py-3 text-sm text-gray-900 font-medium">{{ invite.email }}</td>
-                        <td class="px-4 py-3 text-sm text-gray-500">
-                            {{ invite.created_at.strftime('%d/%m/%Y') }}
-                        </td>
-                        <td class="px-4 py-3 text-right">
-                            <form action="/equipe/invite" method="post" class="inline-block">
-                                <input type="hidden" name="email_list" value="{{ invite.email }}">
-                                <button type="submit"
-                                    class="text-primary-600 hover:text-primary-800 text-xs font-medium bg-primary-50 px-3 py-1 rounded-lg transition-colors">
-                                    Relancer
-                                </button>
-                            </form>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-    {% endif %}
 
     {% if resident_stats %}
     <!-- Desktop table view -->
@@ -201,32 +135,30 @@
             <table class="w-full">
                 <thead>
                     <tr class="border-b border-surface-100">
-                        <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-4">
+                        <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 py-4">
                             Interne</th>
-                        <th class="text-center text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-4">
+                        <th class="text-center text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 py-4">
                             Total</th>
                         <th
-                            class="text-center text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-4 text-rose-600">
-                            Cardio</th>
+                            class="text-center text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 py-4 text-rose-600">
+                            Cardiaque</th>
                         <th
-                            class="text-center text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-4 text-blue-600">
+                            class="text-center text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 py-4 text-blue-600">
                             Thoracique</th>
                         <th
-                            class="text-center text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-4 text-purple-600">
+                            class="text-center text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 py-4 text-purple-600">
                             Vasculaire</th>
-                        <th class="text-center text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-4">
-                            Autonomie</th>
                         <th
-                            class="text-center text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-4 hidden sm:table-cell">
-                            Dernier</th>
-                        <th class="text-right text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-4">
+                            class="text-center text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 py-4 hidden sm:table-cell">
+                            Dernière intervention</th>
+                        <th class="text-right text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 py-4">
                             Action</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-surface-100">
                     {% for stat in resident_stats %}
                     <tr class="hover:bg-surface-50 transition">
-                        <td class="px-6 py-4">
+                        <td class="px-3 py-4">
                             <div class="flex items-center gap-3">
                                 <div
                                     class="w-9 h-9 bg-gradient-to-br from-primary-100 to-primary-200 rounded-xl flex items-center justify-center">
@@ -238,10 +170,10 @@
                                 </div>
                             </div>
                         </td>
-                        <td class="px-6 py-4 text-center">
+                        <td class="px-3 py-4 text-center">
                             <span class="text-lg font-bold text-gray-800">{{ stat.total_logs }}</span>
                         </td>
-                        <td class="px-6 py-4 text-center">
+                        <td class="px-3 py-4 text-center">
                             <div class="flex items-center justify-center gap-1">
                                 <span
                                     class="font-medium {{ 'text-rose-700 font-bold' if averages and stat.cardio_count > averages.cardio else 'text-gray-500' }}">
@@ -252,7 +184,7 @@
                                 {% endif %}
                             </div>
                         </td>
-                        <td class="px-6 py-4 text-center">
+                        <td class="px-3 py-4 text-center">
                             <div class="flex items-center justify-center gap-1">
                                 <span
                                     class="font-medium {{ 'text-blue-700 font-bold' if averages and stat.thoracic_count > averages.thoracic else 'text-gray-500' }}">
@@ -263,7 +195,7 @@
                                 {% endif %}
                             </div>
                         </td>
-                        <td class="px-6 py-4 text-center">
+                        <td class="px-3 py-4 text-center">
                             <div class="flex items-center justify-center gap-1">
                                 <span
                                     class="font-medium {{ 'text-purple-700 font-bold' if averages and stat.vascular_count > averages.vascular else 'text-gray-500' }}">
@@ -274,25 +206,14 @@
                                 {% endif %}
                             </div>
                         </td>
-                        <td class="px-6 py-4 text-center">
-                            <div class="flex items-center justify-center gap-1">
-                                <span
-                                    class="font-medium {{ 'text-teal-700 font-bold' if averages and stat.autonomy_pct > averages.autonomy else 'text-gray-500' }}">
-                                    {{ stat.autonomy_pct }}%
-                                </span>
-                                {% if averages and stat.autonomy_pct > averages.autonomy %}
-                                <span class="text-xs text-teal-500">↑</span>
-                                {% endif %}
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 text-center hidden sm:table-cell">
+                        <td class="px-3 py-4 text-center hidden sm:table-cell">
                             {% if stat.last_log_date %}
                             <span class="text-sm text-gray-600">{{ stat.last_log_date.strftime('%d/%m') }}</span>
                             {% else %}
                             <span class="text-xs text-gray-400">—</span>
                             {% endif %}
                         </td>
-                        <td class="px-6 py-4 text-right">
+                        <td class="px-3 py-4 text-right">
                             <a href="/equipe/{{ stat.user.id }}"
                                 class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary-600 bg-primary-50 rounded-lg hover:bg-primary-100 transition">
                                 Détails
@@ -316,4 +237,72 @@
     </div>
     {% endif %}
 </div>
+
+<!-- Invite Residents -->
+<div class="mb-8 p-6 bg-white border border-surface-200 rounded-2xl shadow-sm">
+    <div class="flex items-center gap-2 mb-4">
+        <svg class="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        </svg>
+        <h2 class="text-lg font-bold text-gray-900">Inviter des internes</h2>
+    </div>
+    <p class="text-sm text-gray-500 mb-4">Envoyez une invitation par email. Les internes recevront un lien pour
+        créer leur compte et rejoindre l'équipe automatiquement.</p>
+
+    <form action="/equipe/invite" method="post" class="flex flex-col sm:flex-row gap-3">
+        <input type="text" name="email_list" required
+            placeholder="Emails séparés par des virgules (ex: a@chu.fr, b@chu.fr)"
+            class="flex-1 px-4 py-2.5 rounded-xl border border-surface-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm">
+        <button type="submit"
+            class="px-6 py-2.5 bg-primary-600 text-white font-medium rounded-xl hover:bg-primary-700 transition shadow-sm whitespace-nowrap">
+            Envoyer les invitations
+        </button>
+    </form>
+</div>
+
+<!-- Pending Invitations -->
+{% if pending_invitations %}
+<div class="mb-8 p-6 bg-white border border-surface-200 rounded-2xl shadow-sm">
+    <div class="flex items-center gap-2 mb-4">
+        <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+        <h2 class="text-lg font-bold text-gray-900">Invitations envoyées</h2>
+    </div>
+    <div class="overflow-hidden border border-gray-100 rounded-xl">
+        <table class="w-full text-left">
+            <thead class="bg-gray-50 border-b border-gray-100">
+                <tr>
+                    <th class="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Email</th>
+                    <th class="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Date d'envoi
+                    </th>
+                    <th class="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">
+                        Action</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-50 bg-white">
+                {% for invite in pending_invitations %}
+                <tr class="hover:bg-gray-50 transition-colors">
+                    <td class="px-4 py-3 text-sm text-gray-900 font-medium">{{ invite.email }}</td>
+                    <td class="px-4 py-3 text-sm text-gray-500">
+                        {{ invite.created_at.strftime('%d/%m/%Y') }}
+                    </td>
+                    <td class="px-4 py-3 text-right">
+                        <form action="/equipe/invite" method="post" class="inline-block">
+                            <input type="hidden" name="email_list" value="{{ invite.email }}">
+                            <button type="submit"
+                                class="text-primary-600 hover:text-primary-800 text-xs font-medium bg-primary-50 px-3 py-1 rounded-lg transition-colors">
+                                Relancer
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
 {% endblock %}
