@@ -117,5 +117,16 @@ def run_postgres_migrations():
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_invitations_email ON invitations (email);"))
             conn.commit()
 
+            # Check procedure_logs.case_id
+            result = conn.execute(text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name='procedure_logs' AND column_name='case_id';"
+            ))
+            if not result.fetchone():
+                print("Migration: Adding 'case_id' column to procedure_logs.")
+                conn.execute(text("ALTER TABLE procedure_logs ADD COLUMN case_id VARCHAR(36);"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_procedure_logs_case_id ON procedure_logs (case_id);"))
+                conn.commit()
+
     except Exception as e:
         print(f"Postgres migration failed: {e}")
