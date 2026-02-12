@@ -136,11 +136,16 @@ def run_postgres_migrations():
             if not result.fetchone():
                 print("Migration: Adding 'section' column to categories.")
                 conn.execute(text("ALTER TABLE categories ADD COLUMN section VARCHAR(50) DEFAULT 'intervention';"))
-                # Update existing
-                conn.execute(text("UPDATE categories SET section = 'gesture' WHERE name = 'Gestes techniques' OR name ILIKE 'ALR%';"))
-                conn.execute(text("UPDATE categories SET section = 'complication' WHERE name ILIKE 'Complication%' OR name ILIKE 'Choc%';"))
                 conn.commit()
-                print("Migration: 'section' column added and initialized.")
+            
+            # Always run updates to ensure existing categories are correctly categorized
+            print("Migration: Updating category sections.")
+            conn.execute(text("UPDATE categories SET section = 'gesture' WHERE name = 'Gestes techniques' OR name ILIKE 'ALR%';"))
+            conn.execute(text("UPDATE categories SET section = 'complication' WHERE name ILIKE 'Complication%' OR name ILIKE 'Choc%';"))
+            # Ensure no nulls
+            conn.execute(text("UPDATE categories SET section = 'intervention' WHERE section IS NULL;"))
+            conn.commit()
+            print("Migration: Category sections updated.")
 
     except Exception as e:
         print(f"Postgres migration failed: {e}")

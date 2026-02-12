@@ -249,6 +249,7 @@ def manage_procedures(
             "request": request,
             "user": user,
             "grouped_categories": grouped_categories,
+            "grouped_sections": grouped_categories, # For consistency
             "items_by_cat": items_by_cat,
         }
     )
