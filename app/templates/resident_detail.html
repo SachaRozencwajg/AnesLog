@@ -54,28 +54,28 @@
             <table class="w-full">
                 <thead>
                     <tr class="border-b border-surface-100 bg-surface-50/50">
-                        <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">
+                        <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 py-3">
                             Date</th>
-                        <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">
+                        <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 py-3">
                             Catégorie</th>
-                        <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">
+                        <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 py-3">
                             Geste</th>
-                        <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">
+                        <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 py-3">
                             Autonomie</th>
                         <th
-                            class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3 hidden md:table-cell">
+                            class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 py-3 hidden md:table-cell">
                             Notes</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-surface-100">
                     {% for log in logs %}
                     <tr class="hover:bg-surface-50 transition">
-                        <td class="px-6 py-3 text-sm text-gray-600 whitespace-nowrap">{{ log.date.strftime('%d/%m/%Y')
+                        <td class="px-3 py-3 text-sm text-gray-600 whitespace-nowrap">{{ log.date.strftime('%d/%m/%Y')
                             }}</td>
-                        <td class="px-6 py-3 text-sm text-gray-500">{{ log.procedure.category.name }}</td>
-                        <td class="px-6 py-3 text-sm font-medium text-gray-800">{{ log.procedure.name }}</td>
-                        <td class="px-6 py-3">
-                            <span class="text-xs px-2 py-1 rounded-full
+                        <td class="px-3 py-3 text-sm text-gray-500">{{ log.procedure.category.name }}</td>
+                        <td class="px-3 py-3 text-sm font-medium text-gray-800">{{ log.procedure.name }}</td>
+                        <td class="px-3 py-3">
+                            <span class="text-xs px-2 py-1 rounded-full whitespace-nowrap
                                 {% if log.autonomy_level.value == 'Je suis autonome' %}badge-autonomous
                                 {% elif log.autonomy_level.value == 'Je sais faire' %}badge-capable
                                 {% elif log.autonomy_level.value == " J'ai fait avec aide" %}badge-assisted {% else
@@ -83,7 +83,7 @@
                                 {{ log.autonomy_level.value }}
                             </span>
                         </td>
-                        <td class="px-6 py-3 text-xs text-gray-400 hidden md:table-cell max-w-xs truncate">{{ log.notes
+                        <td class="px-3 py-3 text-xs text-gray-400 hidden md:table-cell max-w-xs truncate">{{ log.notes
                             or '—' }}</td>
                     </tr>
                     {% endfor %}
