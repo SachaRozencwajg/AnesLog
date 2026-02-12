@@ -196,6 +196,15 @@ def dashboard(
             "borderRadius": 4,
         })
 
+    # Mastered procedures (skip autonomy question for these)
+    from app.models import ProcedureCompetence
+    mastered_ids = set(
+        r[0] for r in db.query(ProcedureCompetence.procedure_id).filter(
+            ProcedureCompetence.user_id == user.id,
+            ProcedureCompetence.is_mastered == True,
+        ).all()
+    )
+
     return templates.TemplateResponse(
         "dashboard.html",
         {
@@ -211,6 +220,7 @@ def dashboard(
             "autonomy_levels": AutonomyLevel,
             "selected_category": category,
             "temporal_chart": temporal_chart,
+            "mastered_procedure_ids": mastered_ids,
         },
     )
 

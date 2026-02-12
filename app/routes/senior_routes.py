@@ -12,6 +12,7 @@ from app.database import get_db
 from app.models import User, Category, Procedure, ProcedureLog, AutonomyLevel, UserRole, Invitation, InvitationStatus
 from app.auth import require_senior, create_invitation_token
 from app.utils.email import send_email
+from datetime import datetime, timezone
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -243,14 +244,25 @@ def manage_procedures(
         else:
             grouped_categories["interventions"].append(cat)
 
+    # Load existing thresholds for this team
+    from app.models import TeamProcedureThreshold
+    thresholds = db.query(TeamProcedureThreshold).filter(
+        TeamProcedureThreshold.team_id == user.team_id
+    ).all()
+    thresholds_by_proc = {
+        t.procedure_id: {"min": t.min_procedures, "max": t.max_procedures}
+        for t in thresholds
+    }
+
     return templates.TemplateResponse(
         "procedures_config.html",
         {
             "request": request,
             "user": user,
             "grouped_categories": grouped_categories,
-            "grouped_sections": grouped_categories, # For consistency
+            "grouped_sections": grouped_categories,
             "items_by_cat": items_by_cat,
+            "thresholds_by_proc": thresholds_by_proc,
         }
     )
 
@@ -341,7 +353,195 @@ def delete_category(
 
 
 # ---------------------------------------------------------------------------
-# Team Details
+# Autonomy Features (must be BEFORE /equipe/{resident_id} to avoid conflicts)
+# ---------------------------------------------------------------------------
+
+@router.get("/equipe/autonomie")
+def autonomy_matrix(
+    request: Request,
+    categorie: int | None = None,
+    user: User = Depends(require_senior),
+    db: Session = Depends(get_db),
+):
+    """Autonomy matrix: all residents × all procedures."""
+    from app.utils.autonomy import build_autonomy_matrix
+    
+    if not user.team_id:
+        return RedirectResponse("/equipe", status_code=303)
+    
+    residents = db.query(User).filter(
+        User.role == UserRole.resident,
+        User.team_id == user.team_id,
+        User.is_approved == True
+    ).all()
+    
+    # Get categories for filter
+    categories = db.query(Category).filter(
+        or_(Category.team_id == None, Category.team_id == user.team_id)
+    ).order_by(Category.name).all()
+    
+    matrix_data = build_autonomy_matrix(db, user.team_id, residents, categorie)
+    
+    return templates.TemplateResponse(
+        "autonomy_matrix.html",
+        {
+            "request": request,
+            "user": user,
+            "residents": residents,
+            "procedures": matrix_data["procedures"],
+            "matrix": matrix_data["matrix"],
+            "thresholds": matrix_data["thresholds"],
+            "categories": categories,
+            "selected_category": categorie,
+        },
+    )
+
+
+@router.get("/equipe/comparaison")
+def comparison_view(
+    request: Request,
+    procedure_id: int | None = None,
+    user: User = Depends(require_senior),
+    db: Session = Depends(get_db),
+):
+    """Inter-resident comparison for a specific procedure."""
+    from app.utils.autonomy import build_comparison_data
+    
+    if not user.team_id:
+        return RedirectResponse("/equipe", status_code=303)
+    
+    residents = db.query(User).filter(
+        User.role == UserRole.resident,
+        User.team_id == user.team_id,
+        User.is_approved == True
+    ).all()
+    
+    # Get all procedures for the filter dropdown
+    procedures = db.query(Procedure).filter(
+        or_(Procedure.team_id == None, Procedure.team_id == user.team_id)
+    ).order_by(Procedure.name).all()
+    
+    comparison = None
+    if procedure_id:
+        comparison = build_comparison_data(db, user.team_id, residents, procedure_id)
+    
+    return templates.TemplateResponse(
+        "comparison.html",
+        {
+            "request": request,
+            "user": user,
+            "procedures": procedures,
+            "selected_procedure_id": procedure_id,
+            "comparison": comparison,
+        },
+    )
+
+
+@router.post("/equipe/valider/{log_id}")
+def validate_log_success(
+    log_id: int,
+    is_success: bool = Form(...),
+    user: User = Depends(require_senior),
+    db: Session = Depends(get_db),
+):
+    """Senior validates whether a procedure was successful."""
+    log = db.query(ProcedureLog).get(log_id)
+    if not log:
+        return RedirectResponse("/equipe", status_code=303)
+    
+    # Verify the log belongs to a resident in the senior's team
+    resident = db.query(User).get(log.user_id)
+    if not resident or resident.team_id != user.team_id:
+        return RedirectResponse("/equipe", status_code=303)
+    
+    log.is_success = is_success
+    db.commit()
+    
+    return RedirectResponse(f"/equipe/{resident.id}", status_code=303)
+
+
+@router.post("/equipe/pre-acquis/{resident_id}/{procedure_id}")
+def toggle_pre_mastery(
+    resident_id: int,
+    procedure_id: int,
+    user: User = Depends(require_senior),
+    db: Session = Depends(get_db),
+):
+    """Toggle pre-acquired status for a resident's procedure."""
+    from app.models import ProcedureCompetence
+    
+    resident = db.query(User).get(resident_id)
+    if not resident or resident.team_id != user.team_id:
+        return RedirectResponse("/equipe", status_code=303)
+    
+    comp = db.query(ProcedureCompetence).filter(
+        ProcedureCompetence.user_id == resident_id,
+        ProcedureCompetence.procedure_id == procedure_id,
+    ).first()
+    
+    if comp:
+        # Toggle off
+        if comp.is_pre_acquired:
+            comp.is_pre_acquired = False
+            comp.is_mastered = False
+        else:
+            comp.is_pre_acquired = True
+            comp.is_mastered = True
+    else:
+        comp = ProcedureCompetence(
+            user_id=resident_id,
+            procedure_id=procedure_id,
+            is_mastered=True,
+            is_pre_acquired=True,
+            mastered_date=datetime.now(timezone.utc),
+        )
+        db.add(comp)
+    
+    db.commit()
+    return RedirectResponse("/equipe/autonomie", status_code=303)
+
+
+@router.post("/equipe/seuils")
+def set_threshold(
+    procedure_id: int = Form(...),
+    min_procedures: int | None = Form(None),
+    max_procedures: int | None = Form(None),
+    user: User = Depends(require_senior),
+    db: Session = Depends(get_db),
+):
+    """Set or update competence threshold for a procedure."""
+    from app.models import TeamProcedureThreshold
+    
+    if not user.team_id:
+        return RedirectResponse("/equipe", status_code=303)
+    
+    # If both fields are empty, redirect with a message
+    if min_procedures is None or max_procedures is None:
+        return RedirectResponse("/equipe/actes?error=seuil_vide", status_code=303)
+    
+    existing = db.query(TeamProcedureThreshold).filter(
+        TeamProcedureThreshold.team_id == user.team_id,
+        TeamProcedureThreshold.procedure_id == procedure_id,
+    ).first()
+    
+    if existing:
+        existing.min_procedures = min_procedures
+        existing.max_procedures = max_procedures
+    else:
+        new_threshold = TeamProcedureThreshold(
+            team_id=user.team_id,
+            procedure_id=procedure_id,
+            min_procedures=min_procedures,
+            max_procedures=max_procedures,
+        )
+        db.add(new_threshold)
+    
+    db.commit()
+    return RedirectResponse("/equipe/actes", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Team Details (MUST be after specific /equipe/... routes)
 # ---------------------------------------------------------------------------
 
 @router.get("/equipe/{resident_id}")
@@ -411,8 +611,44 @@ def resident_detail(
             "autonomy_dict": autonomy_dict,
             "category_labels": [cs[0] for cs in category_stats],
             "category_counts": [cs[1] for cs in category_stats],
+            "lc_cusum_data": _compute_resident_lc_cusum(db, resident_id),
         },
     )
+
+
+def _compute_resident_lc_cusum(db: Session, resident_id: int) -> list[dict]:
+    """Compute LC-CUSUM for each procedure that has logs for this resident."""
+    from app.utils.autonomy import compute_lc_cusum
+    from collections import defaultdict
+    
+    # Get all logs grouped by procedure
+    all_logs = (
+        db.query(ProcedureLog)
+        .filter(ProcedureLog.user_id == resident_id)
+        .order_by(ProcedureLog.date.asc())
+        .all()
+    )
+    
+    by_procedure = defaultdict(list)
+    for log in all_logs:
+        by_procedure[log.procedure_id].append(log)
+    
+    results = []
+    for proc_id, proc_logs in by_procedure.items():
+        if len(proc_logs) < 2:  # Need at least 2 logs for meaningful curve
+            continue
+        cusum = compute_lc_cusum(proc_logs)
+        proc = proc_logs[0].procedure
+        results.append({
+            "procedure_id": proc.id,
+            "procedure_name": proc.name,
+            "category_name": proc.category.name if proc.category else "",
+            "lc_cusum": cusum,
+        })
+    
+    # Sort by procedure name
+    results.sort(key=lambda x: x["procedure_name"])
+    return results
 
 
 @router.post("/equipe/invite")
@@ -472,5 +708,4 @@ def invite_resident(
     
     db.commit()    
     return RedirectResponse("/equipe?success=Invitations+envoyées", status_code=303)
-
 

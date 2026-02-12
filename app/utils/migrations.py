@@ -147,5 +147,58 @@ def run_postgres_migrations():
             conn.commit()
             print("Migration: Category sections updated.")
 
+            # Check procedure_logs.is_success
+            result = conn.execute(text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name='procedure_logs' AND column_name='is_success';"
+            ))
+            if not result.fetchone():
+                print("Migration: Adding 'is_success' column to procedure_logs.")
+                conn.execute(text("ALTER TABLE procedure_logs ADD COLUMN is_success BOOLEAN;"))
+                conn.commit()
+
+            # Make autonomy_level nullable (for mastered procedures)
+            conn.execute(text(
+                "ALTER TABLE procedure_logs ALTER COLUMN autonomy_level DROP NOT NULL;"
+            ))
+            conn.commit()
+
+            # Create procedure_competences table
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS procedure_competences (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES users(id),
+                    procedure_id INTEGER NOT NULL REFERENCES procedures(id),
+                    is_mastered BOOLEAN NOT NULL DEFAULT FALSE,
+                    mastered_at_log_count INTEGER,
+                    mastered_date TIMESTAMP WITH TIME ZONE,
+                    is_pre_acquired BOOLEAN NOT NULL DEFAULT FALSE,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                );
+            """))
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_procedure_competences_user_proc "
+                "ON procedure_competences (user_id, procedure_id);"
+            ))
+            conn.commit()
+            print("Migration: procedure_competences table ready.")
+
+            # Create team_procedure_thresholds table
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS team_procedure_thresholds (
+                    id SERIAL PRIMARY KEY,
+                    team_id INTEGER NOT NULL REFERENCES teams(id),
+                    procedure_id INTEGER NOT NULL REFERENCES procedures(id),
+                    min_procedures INTEGER NOT NULL DEFAULT 5,
+                    max_procedures INTEGER NOT NULL DEFAULT 15
+                );
+            """))
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_team_proc_thresholds_team_proc "
+                "ON team_procedure_thresholds (team_id, procedure_id);"
+            ))
+            conn.commit()
+            print("Migration: team_procedure_thresholds table ready.")
+
     except Exception as e:
         print(f"Postgres migration failed: {e}")

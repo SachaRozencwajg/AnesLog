@@ -151,9 +151,10 @@ class ProcedureLog(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     procedure_id = Column(Integer, ForeignKey("procedures.id"), nullable=False)
     date = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    autonomy_level = Column(SAEnum(AutonomyLevel), nullable=False)
+    autonomy_level = Column(SAEnum(AutonomyLevel), nullable=True)  # Nullable: not asked when mastered
     case_id = Column(String(36), nullable=True, index=True) # Grouping ID for multi-procedure cases
     notes = Column(Text, nullable=True)
+    is_success = Column(Boolean, nullable=True)  # Senior-validated objective success
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
@@ -161,7 +162,7 @@ class ProcedureLog(Base):
     procedure = relationship("Procedure", back_populates="logs")
 
     def __repr__(self):
-        return f"<Log {self.user_id} – {self.procedure.name} ({self.autonomy_level.value})>"
+        return f"<Log {self.user_id} – {self.procedure.name}>"
 
 
 class Invitation(Base):
@@ -181,3 +182,42 @@ class Invitation(Base):
 
     def __repr__(self):
         return f"<Invitation {self.email} -> {self.team_id} ({self.status.value})>"
+
+
+class ProcedureCompetence(Base):
+    """
+    Tracks mastery status for a (user, procedure) pair.
+    When a resident declares autonomy for a procedure, this record is created.
+    """
+    __tablename__ = "procedure_competences"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    procedure_id = Column(Integer, ForeignKey("procedures.id"), nullable=False)
+    is_mastered = Column(Boolean, default=False, nullable=False)
+    mastered_at_log_count = Column(Integer, nullable=True)  # How many logs before mastery
+    mastered_date = Column(DateTime, nullable=True)
+    is_pre_acquired = Column(Boolean, default=False)  # Senior manually marked as pre-acquired
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    # Relationships
+    user = relationship("User")
+    procedure = relationship("Procedure")
+
+
+class TeamProcedureThreshold(Base):
+    """
+    Configurable competence threshold per procedure per team.
+    The senior defines the expected number of procedures before autonomy.
+    """
+    __tablename__ = "team_procedure_thresholds"
+
+    id = Column(Integer, primary_key=True, index=True)
+    team_id = Column(Integer, ForeignKey("teams.id"), nullable=False)
+    procedure_id = Column(Integer, ForeignKey("procedures.id"), nullable=False)
+    min_procedures = Column(Integer, nullable=False, default=5)
+    max_procedures = Column(Integer, nullable=False, default=15)
+
+    # Relationships
+    team = relationship("Team")
+    procedure = relationship("Procedure")

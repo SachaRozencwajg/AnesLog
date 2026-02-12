@@ -259,7 +259,7 @@
                 <div class="border-t border-gray-100"></div>
 
                 <!-- 1. INTERVENTION -->
-                <div>
+                <div x-data="{ selectedIntervention: '', masteredIds: {{ mastered_procedure_ids | list | tojson }} }">
                     <h3 class="flex items-center gap-2 text-sm font-bold text-primary-900 mb-4">
                         <span
                             class="w-6 h-6 rounded-full bg-primary-100 text-primary-700 text-xs flex items-center justify-center">1</span>
@@ -268,7 +268,7 @@
                     <div class="bg-primary-50/50 rounded-xl p-5 border border-primary-100/50">
                         <div class="grid grid-cols-1 gap-4 mb-4">
                             <label class="block text-xs font-medium text-gray-500 mb-1">Type d'intervention</label>
-                            <select name="intervention_id" required
+                            <select name="intervention_id" required x-model="selectedIntervention"
                                 class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-primary-500 focus:border-primary-500 text-sm bg-white shadow-sm transition-shadow">
                                 <option value="">Choisir une intervention...</option>
                                 {% for cat in grouped_sections.interventions %}
@@ -283,12 +283,14 @@
                             </select>
                         </div>
 
-                        <div>
+                        <!-- Autonomy: shown only when procedure is NOT mastered -->
+                        <div x-show="!masteredIds.includes(parseInt(selectedIntervention))">
                             <label class="block text-xs font-medium text-gray-500 mb-2">Niveau d'autonomie</label>
                             <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
                                 {% for level in autonomy_levels %}
                                 <label class="cursor-pointer">
-                                    <input type="radio" name="intervention_autonomy" value="{{ level.value }}" required
+                                    <input type="radio" name="intervention_autonomy" value="{{ level.value }}"
+                                        :required="!masteredIds.includes(parseInt(selectedIntervention))"
                                         class="peer sr-only">
                                     <div
                                         class="px-3 py-2 text-center text-xs font-medium rounded-lg border border-gray-200 bg-white text-gray-600 peer-checked:bg-primary-600 peer-checked:text-white peer-checked:border-primary-600 hover:border-gray-300 transition-all shadow-sm">
@@ -297,6 +299,20 @@
                                 </label>
                                 {% endfor %}
                             </div>
+                        </div>
+
+                        <!-- Mastered: auto-set autonomy -->
+                        <div x-show="masteredIds.includes(parseInt(selectedIntervention))"
+                            class="flex items-center gap-2 p-3 bg-green-50 rounded-lg border border-green-200">
+                            <input type="hidden" name="intervention_autonomy" value="Je suis autonome"
+                                :disabled="!masteredIds.includes(parseInt(selectedIntervention))">
+                            <svg class="w-5 h-5 text-green-600 flex-shrink-0" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span class="text-sm font-medium text-green-700">Compétence acquise — autonomie validée
+                                automatiquement</span>
                         </div>
                     </div>
                 </div>
@@ -323,8 +339,17 @@
                                     <input type="checkbox" name="procedure_ids" value="{{ p.id }}" x-model="checked"
                                         class="w-5 h-5 text-primary-600 rounded border-gray-300 focus:ring-primary-500">
                                     <span class="text-sm font-medium text-gray-800">{{ p.name }}</span>
+                                    {% if p.id in mastered_procedure_ids %}
+                                    <span
+                                        class="ml-auto text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">✓
+                                        Acquis</span>
+                                    {% endif %}
                                 </label>
                                 <div x-show="checked" class="mt-3 pl-8">
+                                    {% if p.id in mastered_procedure_ids %}
+                                    <input type="hidden" name="procedure_autonomies" value="Je suis autonome">
+                                    <p class="text-xs text-green-600 font-medium">Autonomie validée automatiquement</p>
+                                    {% else %}
                                     <select name="procedure_autonomies" :disabled="!checked" required
                                         class="w-full text-xs py-1.5 rounded border-gray-300 focus:ring-primary-500 focus:border-primary-500">
                                         <option value="" selected disabled>Autonomie...</option>
@@ -332,6 +357,7 @@
                                         <option value="{{ level.value }}">{{ level.value }}</option>
                                         {% endfor %}
                                     </select>
+                                    {% endif %}
                                 </div>
                             </div>
                             {% endfor %}

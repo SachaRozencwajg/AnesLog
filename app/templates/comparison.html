@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+{% block title %}Comparaison — AnesLog{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 sm:px-6 py-6">
+
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        <div>
+            <div class="flex items-center gap-2 mb-1">
+                <a href="/equipe/autonomie" class="text-gray-400 hover:text-primary-600 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                </a>
+                <h1 class="text-2xl font-bold text-primary-900">Vue comparative</h1>
+            </div>
+            <p class="text-sm text-gray-500">Comparer l'acquisition d'autonomie par geste</p>
+        </div>
+    </div>
+
+    <!-- Procedure Filter -->
+    <div class="mb-6">
+        <label class="block text-sm font-medium text-gray-600 mb-2">Geste :</label>
+        <select onchange="window.location.href='/equipe/comparaison?procedure_id=' + this.value"
+            class="w-full sm:w-80 px-4 py-2.5 rounded-xl border border-surface-300 bg-white focus:outline-none focus:ring-2 focus:ring-primary-300 text-sm">
+            <option value="">— Sélectionner un geste —</option>
+            {% for proc in procedures %}
+            <option value="{{ proc.id }}" {% if selected_procedure_id==proc.id %}selected{% endif %}>
+                {{ proc.name }} ({{ proc.category.name }})
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    {% if comparison %}
+    <!-- Comparison Chart -->
+    <div class="bg-white rounded-2xl border border-surface-200 p-6 mb-6">
+        <h2 class="text-sm font-semibold text-gray-700 mb-4">
+            {{ comparison.procedure.name }}
+        </h2>
+
+        <div class="space-y-5">
+            {% for r in comparison.residents %}
+            <div class="flex items-start gap-4">
+                <!-- Name -->
+                <div class="w-32 flex-shrink-0 pt-1">
+                    <p class="text-sm font-medium text-gray-800 truncate">{{ r.user.full_name }}</p>
+                </div>
+
+                <!-- Bar + sublabel -->
+                <div class="flex-1">
+                    {% set max_val = [r.log_count, comparison.threshold.max * 2 if comparison.threshold else 30, 30] |
+                    max %}
+                    {% set bar_width = (r.log_count / max_val * 100) if max_val > 0 else 0 %}
+
+                    <div class="h-8 bg-gray-100 rounded-lg overflow-visible relative">
+                        <!-- Threshold zone -->
+                        {% if comparison.threshold %}
+                        <div class="absolute h-full border-l-2 border-dashed border-green-400 opacity-60"
+                            style="left: {{ (comparison.threshold.min / max_val * 100) }}%"></div>
+                        <div class="absolute h-full border-l-2 border-dashed border-green-400 opacity-60"
+                            style="left: {{ (comparison.threshold.max / max_val * 100) }}%"></div>
+                        <div class="absolute h-full bg-green-50 opacity-40"
+                            style="left: {{ (comparison.threshold.min / max_val * 100) }}%; width: {{ ((comparison.threshold.max - comparison.threshold.min) / max_val * 100) }}%">
+                        </div>
+                        <!-- Threshold label (shown once on first bar only) -->
+                        {% if loop.first %}
+                        <div class="absolute -top-5 text-[10px] text-green-600 font-medium whitespace-nowrap"
+                            style="left: {{ ((comparison.threshold.min + comparison.threshold.max) / 2 / max_val * 100) }}%; transform: translateX(-50%);">
+                            Seuil équipe : {{ comparison.threshold.min }}–{{ comparison.threshold.max }} procédures
+                        </div>
+                        {% endif %}
+                        {% endif %}
+
+                        <!-- Progress bar -->
+                        <div class="h-full rounded-lg transition-all duration-500
+                            {% if r.alert_type == 'over_confidence' %}bg-red-400
+                            {% elif r.alert_type == 'under_confidence' %}bg-amber-400
+                            {% elif r.is_mastered %}bg-green-500
+                            {% else %}bg-primary-400{% endif %}" style="width: {{ bar_width }}%">
+                        </div>
+
+                        <!-- Label inside bar -->
+                        <div class="absolute inset-y-0 left-2 flex items-center">
+                            <span class="text-xs font-bold
+                                {% if bar_width > 15 %}text-white{% else %}text-gray-600{% endif %}">
+                                {{ r.log_count }} procédure{{ 's' if r.log_count > 1 else '' }}
+                                {% if r.is_mastered and r.mastered_at %}
+                                → Autonome à {{ r.mastered_at }}
+                                {% endif %}
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Sublabel under bar -->
+                    <div class="mt-1">
+                        {% if r.alert_type == 'over_confidence' %}
+                        <span class="text-[11px] text-red-500 font-medium">⚠ Trop confiant ?</span>
+                        {% elif r.alert_type == 'under_confidence' %}
+                        <span class="text-[11px] text-amber-500 font-medium">ⓘ Sous-confiance ?</span>
+                        {% elif r.is_mastered and comparison.threshold %}
+                        <span class="text-[11px] text-green-600 font-medium">✓ Dans la plage attendue</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Alert badge -->
+                <div class="w-28 flex-shrink-0 text-right pt-1">
+                    {% if r.alert_type == 'over_confidence' %}
+                    <span
+                        class="inline-flex items-center gap-1 px-2 py-1 bg-red-50 text-red-700 text-xs font-medium rounded-lg">
+                        ⚠️ Trop confiant
+                    </span>
+                    {% elif r.alert_type == 'under_confidence' %}
+                    <span
+                        class="inline-flex items-center gap-1 px-2 py-1 bg-amber-50 text-amber-700 text-xs font-medium rounded-lg">
+                        🔸 Sous-confiance
+                    </span>
+                    {% elif r.is_mastered %}
+                    <span
+                        class="inline-flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 text-xs font-medium rounded-lg">
+                        ✓ Autonome
+                    </span>
+                    {% else %}
+                    <span class="text-xs text-gray-400">En cours</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Alerts -->
+    {% for r in comparison.residents %}
+    {% if r.alert_type == 'over_confidence' %}
+    <div class="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+        <svg class="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+        <div>
+            <p class="text-sm font-medium text-red-800">
+                {{ r.user.full_name }} s'est déclaré(e) autonome après seulement {{ r.mastered_at }} procédure{{ 's' if
+                r.mastered_at > 1 else '' }}
+            </p>
+            {% if comparison.threshold %}
+            <p class="text-xs text-red-600 mt-0.5">
+                Seuil équipe : {{ comparison.threshold.min }}–{{ comparison.threshold.max }} procédures
+            </p>
+            {% endif %}
+        </div>
+    </div>
+    {% elif r.alert_type == 'under_confidence' %}
+    <div class="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
+        <svg class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <div>
+            <p class="text-sm font-medium text-amber-800">
+                {{ r.user.full_name }} a réalisé {{ r.log_count }} procédures sans se déclarer autonome
+            </p>
+            {% if comparison.threshold %}
+            <p class="text-xs text-amber-600 mt-0.5">
+                Seuil équipe : {{ comparison.threshold.min }}–{{ comparison.threshold.max }} procédures
+            </p>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+
+    <!-- Individual LC-CUSUM Charts -->
+    {% for r in comparison.residents %}
+    {% if r.lc_cusum and r.lc_cusum.total_attempts > 0 %}
+    <div class="bg-white rounded-2xl border border-surface-200 p-5 mb-4">
+        <h3 class="text-sm font-semibold text-gray-700 mb-3">
+            {{ r.user.full_name }} — Courbe d'apprentissage
+            {% if r.lc_cusum.competence_reached %}
+            <span
+                class="ml-2 inline-flex items-center px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded-full">
+                ✓ Compétent après {{ r.lc_cusum.competence_at }} procédures
+            </span>
+            {% endif %}
+        </h3>
+        <div class="aspect-[3/1]">
+            <canvas id="lccusum-{{ r.user.id }}"></canvas>
+        </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+
+    {% elif not selected_procedure_id %}
+    <div class="bg-white rounded-2xl border border-surface-200 p-10 text-center">
+        <div class="w-14 h-14 bg-surface-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <svg class="w-7 h-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+        </div>
+        <p class="text-sm text-gray-500">Sélectionnez un geste pour comparer vos internes.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        {% if comparison %}
+        {% for r in comparison.residents %}
+        {% if r.lc_cusum and r.lc_cusum.total_attempts > 0 %}
+        (function () {
+            const data = {{ r.lc_cusum | tojson
+        }};
+    const ctx = document.getElementById('lccusum-{{ r.user.id }}');
+    if (!ctx) return;
+
+    const labels = data.data_points.map(d => d.attempt);
+    const scores = data.data_points.map(d => d.score);
+
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Score LC-CUSUM',
+                    data: scores,
+                    borderColor: '#2563eb',
+                    backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 4,
+                    pointBackgroundColor: data.data_points.map(d =>
+                        d.success ? '#22c55e' : '#ef4444'
+                    ),
+                    borderWidth: 2,
+                },
+                {
+                    label: 'Seuil de compétence',
+                    data: Array(labels.length).fill(data.threshold),
+                    borderColor: '#22c55e',
+                    borderDash: [5, 5],
+                    borderWidth: 1.5,
+                    pointRadius: 0,
+                    fill: false,
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        afterBody: function (ctx) {
+                            const idx = ctx[0].dataIndex;
+                            const dp = data.data_points[idx];
+                            return `Autonomie: ${dp.autonomy}\n${dp.success ? '✓ Succès' : '✗ Échec'}${dp.is_senior_validated ? ' (validé sénior)' : ''}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    title: { display: true, text: 'Tentative n°', font: { size: 11 } },
+                    grid: { display: false }
+                },
+                y: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Score cumulatif', font: { size: 11 } },
+                    grid: { color: '#f1f5f9' }
+                }
+            }
+        }
+    });
+    }) ();
+    {% endif %}
+    {% endfor %}
+    {% endif %}
+});
+</script>
+{% endblock %}
