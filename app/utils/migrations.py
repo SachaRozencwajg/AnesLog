@@ -128,5 +128,19 @@ def run_postgres_migrations():
                 conn.execute(text("CREATE INDEX IF NOT EXISTS ix_procedure_logs_case_id ON procedure_logs (case_id);"))
                 conn.commit()
 
+            # Check categories.section
+            result = conn.execute(text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name='categories' AND column_name='section';"
+            ))
+            if not result.fetchone():
+                print("Migration: Adding 'section' column to categories.")
+                conn.execute(text("ALTER TABLE categories ADD COLUMN section VARCHAR(50) DEFAULT 'intervention';"))
+                # Update existing
+                conn.execute(text("UPDATE categories SET section = 'gesture' WHERE name = 'Gestes techniques' OR name ILIKE 'ALR%';"))
+                conn.execute(text("UPDATE categories SET section = 'complication' WHERE name ILIKE 'Complication%' OR name ILIKE 'Choc%';"))
+                conn.commit()
+                print("Migration: 'section' column added and initialized.")
+
     except Exception as e:
         print(f"Postgres migration failed: {e}")
