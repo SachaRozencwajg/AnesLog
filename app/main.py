@@ -7,9 +7,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from app.database import engine, Base
+from app.database import engine, Base, get_db
 from app.auth import get_optional_user
 from app.models import User, UserRole
+from sqlalchemy.orm import Session
 
 # Create tables on startup
 Base.metadata.create_all(bind=engine)
