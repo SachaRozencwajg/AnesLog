@@ -107,6 +107,10 @@ class Category(Base):
     team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)
     team = relationship("Team")
 
+    # Section grouping for UI (intervention, gesture, complication)
+    # Default is "intervention" for backwards compatibility
+    section = Column(String(50), default="intervention", nullable=False)
+
     # Relationships
     procedures = relationship("Procedure", back_populates="category", cascade="all, delete-orphan")
 

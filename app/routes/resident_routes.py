@@ -84,7 +84,23 @@ def dashboard(
     )
     recent_logs = recent_query.all()
 
-    # Fetch procedures for the "Add Case" modal, grouped by category name
+    # Fetch all categories accessible to user
+    categories = db.query(Category).filter(
+        or_(
+            Category.team_id == None,
+            Category.team_id == user.team_id
+        )
+    ).order_by(Category.name).all()
+
+    # Organize categories by section
+    grouped_sections = {
+        "interventions": [],
+        "gestures": [],
+        "complications": []
+    }
+    
+    # Store procedures by category_id for easy lookup
+    procedures_by_cat_id = defaultdict(list)
     all_procs = db.query(Procedure).join(Category).filter(
         or_(
             Procedure.team_id == None,
@@ -92,17 +108,16 @@ def dashboard(
         )
     ).order_by(Procedure.name).all()
 
-    procedures_by_cat = defaultdict(list)
     for p in all_procs:
-        procedures_by_cat[p.category.name].append(p)
+        procedures_by_cat_id[p.category_id].append(p)
 
-    # All categories for filter chips
-    categories = db.query(Category).filter(
-        or_(
-            Category.team_id == None,
-            Category.team_id == user.team_id
-        )
-    ).order_by(Category.name).all()
+    for cat in categories:
+        if cat.section == "gesture":
+            grouped_sections["gestures"].append(cat)
+        elif cat.section == "complication":
+            grouped_sections["complications"].append(cat)
+        else:
+            grouped_sections["interventions"].append(cat)
 
     # -------------------------------------------------------------------
     # Temporal progression data (last 6 months, grouped by month)
@@ -191,7 +206,8 @@ def dashboard(
             "autonomy_dict": autonomy_dict,
             "recent_logs": recent_logs,
             "categories": categories,
-            "procedures_by_cat": procedures_by_cat,
+            "grouped_sections": grouped_sections,
+            "procedures_by_cat_id": procedures_by_cat_id,
             "autonomy_levels": AutonomyLevel,
             "selected_category": category,
             "temporal_chart": temporal_chart,

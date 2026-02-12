@@ -48,8 +48,10 @@ def run_migrations():
             ("users", "is_active", "BOOLEAN DEFAULT 0"),
             ("users", "team_id", "INTEGER"),
             ("users", "is_approved", "BOOLEAN DEFAULT 0"),
+            ("users", "is_approved", "BOOLEAN DEFAULT 0"),
             ("categories", "team_id", "INTEGER"),
             ("procedures", "team_id", "INTEGER"),
+            ("categories", "section", "VARCHAR(50) DEFAULT 'intervention'"),  # New column
         ]
         
         for table, col_name, col_type in migrations:
@@ -62,6 +64,10 @@ def run_migrations():
                     cursor.execute("UPDATE users SET is_active = 1")
                 if table == "users" and col_name == "is_approved":
                     cursor.execute("UPDATE users SET is_approved = 1")
+                if table == "categories" and col_name == "section":
+                    # Update legacy categories
+                    cursor.execute("UPDATE categories SET section = 'gesture' WHERE name = 'Gestes techniques'")
+                    cursor.execute("UPDATE categories SET section = 'complication' WHERE name LIKE 'Complications%'")
             except sqlite3.OperationalError as e:
                 # Ignore "duplicate column name" error
                 pass

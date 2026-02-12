@@ -228,12 +228,27 @@ def manage_procedures(
     for cat_id in items_by_cat:
         items_by_cat[cat_id].sort(key=lambda x: x.name)
 
+    # Group categories into sections
+    grouped_categories = {
+        "interventions": [],
+        "gestures": [],
+        "complications": []
+    }
+
+    for cat in categories:
+        if cat.section == "gesture":
+            grouped_categories["gestures"].append(cat)
+        elif cat.section == "complication":
+            grouped_categories["complications"].append(cat)
+        else:
+            grouped_categories["interventions"].append(cat)
+
     return templates.TemplateResponse(
         "procedures_config.html",
         {
             "request": request,
             "user": user,
-            "categories": categories,
+            "grouped_categories": grouped_categories,
             "items_by_cat": items_by_cat,
         }
     )
@@ -243,6 +258,7 @@ def manage_procedures(
 def add_category(
     request: Request,
     name: str = Form(...),
+    section: str = Form("intervention"),  # New param
     user: User = Depends(require_senior),
     db: Session = Depends(get_db),
 ):
@@ -256,7 +272,11 @@ def add_category(
     ).first()
     
     if not exists:
-        new_cat = Category(name=name.strip(), team_id=user.team_id)
+        new_cat = Category(
+            name=name.strip(),
+            team_id=user.team_id,
+            section=section
+        )
         db.add(new_cat)
         db.commit()
         
