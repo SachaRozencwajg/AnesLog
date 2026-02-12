@@ -18,3 +18,5 @@ steps:
     - 'europe-west1'
 images:
   - 'gcr.io/$PROJECT_ID/aneslog'
+options:
+  logging: CLOUD_LOGGING_ONLY
