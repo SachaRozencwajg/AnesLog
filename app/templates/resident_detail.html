@@ -78,8 +78,7 @@
             <div class="flex gap-4 text-xs text-gray-500">
                 <span>🔒 Validé : <strong class="text-green-700">{{ acq_stats.locked }}</strong></span>
                 <span>✓ Maîtrisé : <strong class="text-amber-600">{{ acq_stats.mastered }}</strong></span>
-                <span>📖 En cours : <strong class="text-blue-600">{{ acq_stats.capable + acq_stats.learning
-                        }}</strong></span>
+                <span>📖 En cours : <strong class="text-blue-600">{{ acq_stats.learning }}</strong></span>
                 <span>· Non commencé : <strong>{{ acq_stats.not_started }}</strong></span>
             </div>
         </div>
@@ -102,8 +101,9 @@
                 <div class="flex items-center justify-between px-5 py-3 hover:bg-surface-50 transition">
                     <div>
                         <p class="text-sm font-medium text-gray-800">{{ info.procedure.name }}</p>
-                        <p class="text-xs text-gray-400">{{ info.log_count }} actes · {{ info.autonomous_count }}
-                            autonomes</p>
+                        <p class="text-xs text-gray-400">{{ info.log_count }} actes · {{ info.mastery_count }}
+                            {{ 'géré' if info.is_complication else 'autonome' }}{{ 's' if info.mastery_count > 1 else ''
+                            }}</p>
                     </div>
                     {% if info.is_locked %}
                     <span
@@ -239,11 +239,13 @@
                             <td class="px-3 py-3">
                                 {% if log.autonomy_level %}
                                 <span class="text-xs px-2 py-1 rounded-full whitespace-nowrap
-                                    {% if log.autonomy_level.value == 'Je suis autonome' %}badge-autonomous
-                                    {% elif log.autonomy_level.value == 'Je sais faire' %}badge-capable
-                                {% elif log.autonomy_level.value == " J'ai fait avec aide" %}badge-assisted else
-                                    %}badge-observed{% endif %}">
-                                    {{ log.autonomy_level.value }}
+                                    {% if log.autonomy_level == 'Autonome' %}badge-autonomous
+                                    {% elif log.autonomy_level == 'Supervisé' %}badge-capable
+                                    {% elif log.autonomy_level == 'Assisté' %}badge-assisted
+                                    {% elif log.autonomy_level == 'Géré' %}bg-red-100 text-red-700
+                                    {% elif log.autonomy_level == 'Participé' %}bg-orange-100 text-orange-700
+                                    {% else %}badge-observed{% endif %}">
+                                    {{ log.autonomy_level }}
                                 </span>
                                 {% else %}
                                 <span class="text-xs text-gray-400">—</span>
@@ -346,7 +348,7 @@
     // Competency acquisition doughnut chart
     const acqStats = {{ acq_stats | tojson }};
     const acqLabels = ['Validé', 'Maîtrisé', 'En cours', 'Non commencé'];
-    const acqInProgress = (acqStats.autonomous || 0) + (acqStats.capable || 0) + (acqStats.learning || 0);
+    const acqInProgress = acqStats.learning || 0;
     const acqCounts = [acqStats.locked || 0, acqStats.mastered || 0, acqInProgress, acqStats.not_started || 0];
 
     if (acqCounts.some(v => v > 0)) {

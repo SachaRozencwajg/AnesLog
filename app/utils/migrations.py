@@ -265,6 +265,53 @@ def run_postgres_migrations():
             print("Migration: guard_logs table ready.")
 
             # ----------------------------------------------------------
+            # Convert autonomy_level from PG enum to VARCHAR(50)
+            # ----------------------------------------------------------
+            # Check if column is still a PG enum type
+            r = conn.execute(text(
+                "SELECT data_type, udt_name FROM information_schema.columns "
+                "WHERE table_name='procedure_logs' AND column_name='autonomy_level';"
+            ))
+            col_info = r.fetchone()
+            if col_info and col_info[1] == 'autonomylevel':
+                print("Migration: Converting autonomy_level from PG enum to VARCHAR(50).")
+                # 1. Add a temporary varchar column
+                conn.execute(text(
+                    "ALTER TABLE procedure_logs ADD COLUMN autonomy_level_tmp VARCHAR(50);"
+                ))
+                # 2. Copy data, mapping old enum names → display labels
+                conn.execute(text(
+                    "UPDATE procedure_logs SET autonomy_level_tmp = CASE autonomy_level::text "
+                    "WHEN 'observed' THEN 'Observé' "
+                    "WHEN 'assisted' THEN 'Assisté' "
+                    "WHEN 'capable' THEN 'Supervisé' "
+                    "WHEN 'supervised' THEN 'Supervisé' "
+                    "WHEN 'autonomous' THEN 'Autonome' "
+                    "WHEN 'Observé' THEN 'Observé' "
+                    "WHEN 'Assisté' THEN 'Assisté' "
+                    "WHEN 'Supervisé' THEN 'Supervisé' "
+                    "WHEN 'Autonome' THEN 'Autonome' "
+                    "WHEN 'Participé' THEN 'Participé' "
+                    "WHEN 'Géré' THEN 'Géré' "
+                    "ELSE autonomy_level::text END;"
+                ))
+                # 3. Drop the old enum column
+                conn.execute(text(
+                    "ALTER TABLE procedure_logs DROP COLUMN autonomy_level;"
+                ))
+                # 4. Rename temp column to autonomy_level
+                conn.execute(text(
+                    "ALTER TABLE procedure_logs RENAME COLUMN autonomy_level_tmp TO autonomy_level;"
+                ))
+                # 5. Drop the old enum type (cleanup)
+                try:
+                    conn.execute(text("DROP TYPE IF EXISTS autonomylevel;"))
+                except Exception:
+                    pass  # OK if other tables still reference it
+                conn.commit()
+                print("Migration: autonomy_level converted to VARCHAR(50).")
+
+            # ----------------------------------------------------------
             # Comprehensive column check: add ANY column missing from models
             # ----------------------------------------------------------
             _missing_columns = [

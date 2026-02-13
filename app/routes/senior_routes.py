@@ -15,6 +15,7 @@ from app.models import (
 )
 from app.auth import require_senior, create_invitation_token
 from app.utils.email import send_email
+from app.utils.autonomy import MASTERY_VALUES
 from datetime import datetime, timezone
 
 router = APIRouter()
@@ -90,7 +91,7 @@ def team_overview(
 
         autonomous_count = db.query(func.count(ProcedureLog.id)).filter(
             ProcedureLog.user_id == resident.id,
-            ProcedureLog.autonomy_level == AutonomyLevel.autonomous,
+            ProcedureLog.autonomy_level.in_(list(MASTERY_VALUES)),
         ).scalar() or 0
 
         last_log = (
@@ -653,9 +654,9 @@ def resident_detail(
         .group_by(ProcedureLog.autonomy_level)
         .all()
     )
-    autonomy_dict = {level.value: 0 for level in AutonomyLevel}
+    autonomy_dict = {}
     for level, count in autonomy_stats:
-        autonomy_dict[level.value] = count
+        autonomy_dict[level] = count
 
     # Acquisition stats + per-procedure mastery for validation buttons
     from app.utils.autonomy import compute_acquisition_stats, compute_procedure_mastery_levels

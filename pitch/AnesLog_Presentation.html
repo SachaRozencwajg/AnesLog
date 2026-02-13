@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AnesLog — Présentation</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300;8..60,400;8..60,600;8..60,700&family=Inter:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --ink: #1B2536;
+            --ink-light: #4A5568;
+            --ink-muted: #8794A7;
+            --blue: #2B4AC7;
+            --blue-light: #EBF0FF;
+            --teal: #0F766E;
+            --teal-light: #F0FDFA;
+            --surface: #F7F8FA;
+            --border: #E2E6EC;
+            --white: #FFFFFF;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            color: var(--ink);
+            background: var(--white);
+            line-height: 1.65;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        @page {
+            size: A4;
+            margin: 0;
+        }
+
+        .page {
+            width: 210mm;
+            min-height: 297mm;
+            margin: 0 auto;
+            page-break-after: always;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .page:last-child {
+            page-break-after: avoid;
+        }
+
+        /* Typography */
+        .serif {
+            font-family: 'Source Serif 4', Georgia, serif;
+        }
+
+        /* ═══════════════ PAGE 1 — COVER ═══════════════ */
+        .cover {
+            background: var(--ink);
+            color: var(--white);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 60px 60px 40px;
+        }
+
+        .cover-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .cover-logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 18px;
+            font-weight: 600;
+            letter-spacing: -0.3px;
+        }
+
+        .cover-logo svg {
+            width: 32px;
+            height: 32px;
+        }
+
+        .cover-tag {
+            font-size: 11px;
+            font-weight: 500;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            opacity: 0.5;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 6px 14px;
+            border-radius: 4px;
+        }
+
+        .cover-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 60px 0;
+        }
+
+        .cover-main h1 {
+            font-family: 'Source Serif 4', Georgia, serif;
+            font-size: 52px;
+            font-weight: 700;
+            letter-spacing: -1.5px;
+            line-height: 1.1;
+            margin-bottom: 24px;
+        }
+
+        .cover-main h1 span {
+            color: #7B93DB;
+        }
+
+        .cover-main p {
+            font-size: 17px;
+            font-weight: 300;
+            line-height: 1.6;
+            opacity: 0.75;
+            max-width: 440px;
+        }
+
+        .cover-line {
+            width: 60px;
+            height: 2px;
+            background: #7B93DB;
+            margin-bottom: 24px;
+        }
+
+        .cover-bottom {
+            display: flex;
+            gap: 50px;
+            padding-top: 30px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .cover-stat {
+            text-align: left;
+        }
+
+        .cover-stat-number {
+            font-family: 'Source Serif 4', Georgia, serif;
+            font-size: 32px;
+            font-weight: 700;
+            display: block;
+            line-height: 1.2;
+        }
+
+        .cover-stat-label {
+            font-size: 11px;
+            opacity: 0.45;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        .cover-footer {
+            position: absolute;
+            bottom: 20px;
+            right: 60px;
+            font-size: 10px;
+            opacity: 0.3;
+        }
+
+        /* ═══════════════ CONTENT PAGES ═══════════════ */
+        .content-page {
+            padding: 55px 60px;
+        }
+
+        .page-label {
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--blue);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+        }
+
+        .page-title {
+            font-family: 'Source Serif 4', Georgia, serif;
+            font-size: 30px;
+            font-weight: 700;
+            color: var(--ink);
+            letter-spacing: -0.5px;
+            line-height: 1.25;
+            margin-bottom: 6px;
+        }
+
+        .page-subtitle {
+            font-size: 14px;
+            color: var(--ink-light);
+            line-height: 1.6;
+            max-width: 500px;
+        }
+
+        .divider {
+            width: 40px;
+            height: 2px;
+            background: var(--blue);
+            margin: 20px 0 30px;
+        }
+
+        /* ═══════════════ PAGE 2 — PROBLEM ═══════════════ */
+        .problem-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+            margin-top: 28px;
+        }
+
+        .problem-card {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 26px;
+        }
+
+        .problem-card .icon-circle {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 14px;
+        }
+
+        .problem-card .icon-circle svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .icon-circle.red {
+            background: #FEF2F2;
+            color: #DC2626;
+        }
+
+        .icon-circle.orange {
+            background: #FFF7ED;
+            color: #EA580C;
+        }
+
+        .icon-circle.yellow {
+            background: #FEFCE8;
+            color: #CA8A04;
+        }
+
+        .icon-circle.slate {
+            background: #F1F5F9;
+            color: #475569;
+        }
+
+        .problem-card h3 {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        .problem-card p {
+            font-size: 12.5px;
+            color: var(--ink-light);
+            line-height: 1.6;
+        }
+
+        .quote-block {
+            background: var(--surface);
+            border-left: 3px solid var(--ink);
+            padding: 22px 28px;
+            margin-top: 30px;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .quote-block p {
+            font-family: 'Source Serif 4', Georgia, serif;
+            font-size: 14.5px;
+            font-style: italic;
+            color: var(--ink);
+            line-height: 1.6;
+        }
+
+        .quote-block .quote-source {
+            font-family: 'Inter', sans-serif;
+            font-size: 11px;
+            font-style: normal;
+            color: var(--ink-muted);
+            margin-top: 10px;
+            font-weight: 500;
+        }
+
+        /* ═══════════════ PAGE 3 — SOLUTION ═══════════════ */
+        .solution-hero {
+            background: var(--ink);
+            border-radius: 12px;
+            padding: 30px 34px;
+            color: var(--white);
+            margin-bottom: 28px;
+        }
+
+        .solution-hero h3 {
+            font-family: 'Source Serif 4', Georgia, serif;
+            font-size: 19px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .solution-hero p {
+            font-size: 13.5px;
+            opacity: 0.8;
+            line-height: 1.65;
+        }
+
+        .feature-list {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .feature-item {
+            display: flex;
+            gap: 14px;
+            padding: 18px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+        }
+
+        .feature-number {
+            width: 30px;
+            height: 30px;
+            min-width: 30px;
+            background: var(--blue);
+            color: white;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .feature-item h4 {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 3px;
+        }
+
+        .feature-item p {
+            font-size: 11.5px;
+            color: var(--ink-light);
+            line-height: 1.5;
+        }
+
+        .conformity-banner {
+            background: var(--teal-light);
+            border: 1px solid #99F6E4;
+            border-radius: 10px;
+            padding: 20px 24px;
+            margin-top: 24px;
+            display: flex;
+            gap: 14px;
+            align-items: flex-start;
+        }
+
+        .conformity-banner svg {
+            width: 20px;
+            height: 20px;
+            min-width: 20px;
+            color: var(--teal);
+            margin-top: 2px;
+        }
+
+        .conformity-banner h4 {
+            color: var(--teal);
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .conformity-banner p {
+            font-size: 12px;
+            color: #115E59;
+            line-height: 1.55;
+        }
+
+        /* ═══════════════ SCREENSHOTS ═══════════════ */
+        .screenshot-container {
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 16px rgba(0, 0, 0, 0.06);
+            border: 1px solid var(--border);
+        }
+
+        .screenshot-container img {
+            width: 100%;
+            display: block;
+        }
+
+        .screenshot-label {
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--blue);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 6px;
+        }
+
+        .screenshot-desc {
+            font-size: 13px;
+            color: var(--ink-light);
+            margin-bottom: 16px;
+            line-height: 1.55;
+        }
+
+        .two-screenshots {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-top: 14px;
+        }
+
+        .screenshot-block h3 {
+            font-size: 17px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        /* ═══════════════ PAGE 6 — VALUE ═══════════════ */
+        .value-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+            margin-top: 24px;
+        }
+
+        .value-card {
+            border-radius: 10px;
+            padding: 24px;
+            border: 1px solid var(--border);
+        }
+
+        .value-card h3 {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .value-card h3 svg {
+            width: 20px;
+            height: 20px;
+            min-width: 20px;
+        }
+
+        .value-card ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .value-card ul li {
+            font-size: 12.5px;
+            color: var(--ink-light);
+            padding: 3px 0 3px 20px;
+            position: relative;
+            line-height: 1.5;
+        }
+
+        .value-card ul li::before {
+            content: "";
+            position: absolute;
+            left: 2px;
+            top: 10px;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--blue);
+            opacity: 0.4;
+        }
+
+        /* Comparison Table */
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 24px;
+            font-size: 12.5px;
+        }
+
+        .comparison-table thead {
+            background: var(--surface);
+        }
+
+        .comparison-table th {
+            padding: 12px 16px;
+            font-weight: 600;
+            text-align: left;
+            border-bottom: 2px solid var(--border);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--ink-light);
+        }
+
+        .comparison-table th:last-child {
+            color: var(--blue);
+        }
+
+        .comparison-table td {
+            padding: 10px 16px;
+            border-bottom: 1px solid #F1F3F5;
+            color: var(--ink-light);
+        }
+
+        .comparison-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .check {
+            color: var(--teal);
+            font-weight: 600;
+        }
+
+        .cross {
+            color: #CBD5E1;
+        }
+
+        /* ═══════════════ PAGE 7 — CTA ═══════════════ */
+        .cta-page {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 60px;
+        }
+
+        .cta-page h2 {
+            font-family: 'Source Serif 4', Georgia, serif;
+            font-size: 34px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            margin-bottom: 16px;
+            line-height: 1.2;
+        }
+
+        .cta-page>p {
+            font-size: 15px;
+            color: var(--ink-light);
+            max-width: 440px;
+            line-height: 1.6;
+            margin-bottom: 36px;
+        }
+
+        .cta-box {
+            background: var(--ink);
+            border-radius: 12px;
+            padding: 36px 44px;
+            color: white;
+            width: 100%;
+            max-width: 460px;
+            margin-bottom: 32px;
+            text-align: left;
+        }
+
+        .cta-box h3 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 18px;
+        }
+
+        .cta-contact div {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 0;
+            font-size: 14px;
+        }
+
+        .cta-contact svg {
+            width: 18px;
+            height: 18px;
+            opacity: 0.5;
+        }
+
+        .deploy-note {
+            background: var(--surface);
+            border-radius: 10px;
+            padding: 18px 26px;
+            border: 1px solid var(--border);
+            max-width: 460px;
+            width: 100%;
+            text-align: left;
+        }
+
+        .deploy-note h4 {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .deploy-note p {
+            font-size: 12px;
+            color: var(--ink-light);
+            line-height: 1.55;
+        }
+
+        .cta-footer {
+            text-align: center;
+            padding-top: 28px;
+            border-top: 1px solid var(--border);
+            width: 100%;
+            margin-top: auto;
+        }
+
+        .cta-footer p {
+            font-size: 10px;
+            color: var(--ink-muted);
+        }
+
+        @media print {
+            body {
+                background: white;
+            }
+
+            .page {
+                box-shadow: none;
+                border: none;
+            }
+        }
+
+        @media screen {
+            body {
+                background: #E5E7EB;
+                padding: 40px 0;
+            }
+
+            .page {
+                box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+                margin-bottom: 40px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- ══════════════ PAGE 1 — COUVERTURE ══════════════ -->
+    <div class="page cover">
+        <div class="cover-top">
+            <div class="cover-logo">
+                <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="32" height="32" rx="8" fill="#3B5BDB" opacity="0.9" />
+                    <path d="M10 10h12v2H10zm0 5h12v2H10zm0 5h8v2h-8z" fill="white" />
+                </svg>
+                AnesLog
+            </div>
+            <div class="cover-tag">Février 2026</div>
+        </div>
+
+        <div class="cover-main">
+            <div class="cover-line"></div>
+            <h1>Le carnet de bord<br>numérique du <span>DESAR</span></h1>
+            <p>Suivi structuré des compétences en Anesthésie-Réanimation, conforme à la maquette du Journal Officiel du
+                28 avril 2017.</p>
+        </div>
+
+        <div class="cover-bottom">
+            <div class="cover-stat">
+                <span class="cover-stat-number">10</span>
+                <span class="cover-stat-label">Semestres suivis</span>
+            </div>
+            <div class="cover-stat">
+                <span class="cover-stat-number">7</span>
+                <span class="cover-stat-label">Domaines de compétences</span>
+            </div>
+            <div class="cover-stat">
+                <span class="cover-stat-number">60+</span>
+                <span class="cover-stat-label">Procédures référencées</span>
+            </div>
+        </div>
+
+        <div class="cover-footer">Conforme à l'arrêté du 21 avril 2017</div>
+    </div>
+
+    <!-- ══════════════ PAGE 2 — LE CONSTAT ══════════════ -->
+    <div class="page content-page">
+        <div class="page-label">01 — Le constat</div>
+        <h2 class="page-title">Le suivi de la formation DESAR<br>reste complexe et fragmenté</h2>
+        <div class="divider"></div>
+
+        <div class="problem-grid">
+            <div class="problem-card">
+                <div class="icon-circle red">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                </div>
+                <h3>Traçabilité manuelle</h3>
+                <p>Classeurs papier et tableurs Excel non standardisés. Perte de données fréquente, consolidation
+                    rétrospective quasi impossible.</p>
+            </div>
+
+            <div class="problem-card">
+                <div class="icon-circle orange">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                </div>
+                <h3>Visibilité limitée</h3>
+                <p>Sans outil centralisé, les coordinateurs n'ont aucune vision globale de la progression réelle de
+                    chaque interne dans la maquette.</p>
+            </div>
+
+            <div class="problem-card">
+                <div class="icon-circle yellow">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                </div>
+                <h3>Compétences difficiles à évaluer</h3>
+                <p>Le passage des niveaux d'autonomie (observé, assisté, supervisé, autonome) est rarement documenté de
+                    manière structurée.</p>
+            </div>
+
+            <div class="problem-card">
+                <div class="icon-circle slate">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                            d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                    </svg>
+                </div>
+                <h3>Actes déconnectés de la maquette</h3>
+                <p>Les internes logguent des cas sans savoir précisément quels domaines de compétence ils alimentent
+                    dans le référentiel officiel.</p>
+            </div>
+        </div>
+
+        <div class="quote-block">
+            <p>« La réforme du DES impose un suivi longitudinal rigoureux des compétences. Pourtant, la plupart des CHU
+                ne disposent d'aucun outil numérique adapté à cette exigence. »</p>
+            <div class="quote-source">Constat partagé par de nombreux coordinateurs de DES en Anesthésie-Réanimation
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════ PAGE 3 — LA SOLUTION ══════════════ -->
+    <div class="page content-page">
+        <div class="page-label">02 — La solution</div>
+        <h2 class="page-title">Un outil conçu par et pour<br>les anesthésistes</h2>
+        <div class="divider"></div>
+
+        <div class="solution-hero">
+            <h3>Une plateforme web simple, moderne et conforme</h3>
+            <p>AnesLog est une application web accessible depuis n'importe quel appareil. Elle permet à chaque interne
+                de tracer ses actes, suivre sa progression dans la maquette, et partager son parcours avec son
+                coordinateur — en quelques clics.</p>
+        </div>
+
+        <div class="feature-list">
+            <div class="feature-item">
+                <div class="feature-number">1</div>
+                <div>
+                    <h4>Tableau de bord semestriel</h4>
+                    <p>Vue synthétique du semestre en cours : hôpital, service, progression, interventions par
+                        catégorie.</p>
+                </div>
+            </div>
+            <div class="feature-item">
+                <div class="feature-number">2</div>
+                <div>
+                    <h4>Carnet de bord structuré</h4>
+                    <p>Enregistrement rapide de chaque acte avec catégorie, procédure, niveau d'autonomie et
+                        commentaires.</p>
+                </div>
+            </div>
+            <div class="feature-item">
+                <div class="feature-number">3</div>
+                <div>
+                    <h4>Suivi de la maquette DESAR</h4>
+                    <p>Progression par domaine de compétence (A à G + COBA), conforme au référentiel officiel 2017.</p>
+                </div>
+            </div>
+            <div class="feature-item">
+                <div class="feature-number">4</div>
+                <div>
+                    <h4>Gestion des 10 semestres</h4>
+                    <p>Historique complet avec lieux de stage, dates et chef de service, protection anti-chevauchement.
+                    </p>
+                </div>
+            </div>
+            <div class="feature-item">
+                <div class="feature-number">5</div>
+                <div>
+                    <h4>Niveaux d'autonomie</h4>
+                    <p>Acquisition progressive documentée, du stade observé jusqu'à la gestion autonome complète.</p>
+                </div>
+            </div>
+            <div class="feature-item">
+                <div class="feature-number">6</div>
+                <div>
+                    <h4>Validation sénior</h4>
+                    <p>Les médecins référents valident la maîtrise des procédures de leurs internes.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="conformity-banner">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+                <h4>Conformité réglementaire</h4>
+                <p>AnesLog intègre l'intégralité des domaines de compétences et sous-compétences de la maquette DESAR
+                    telle que définie par l'arrêté du 21 avril 2017 (Journal Officiel du 28 avril 2017), incluant les
+                    phases Socle, Approfondissement et Consolidation.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════ PAGE 4 — CAPTURES (1/2) ══════════════ -->
+    <div class="page content-page">
+        <div class="page-label">03 — L'application</div>
+        <h2 class="page-title">Une interface claire et intuitive</h2>
+        <div class="divider"></div>
+
+        <div class="screenshot-block">
+            <div class="screenshot-label">Tableau de bord</div>
+            <h3>Vue d'ensemble du semestre en cours</h3>
+            <p class="screenshot-desc">L'interne visualise instantanément sa progression : hôpital, dates, nombre
+                d'interventions par catégorie chirurgicale et gestes techniques réalisés.</p>
+            <div class="screenshot-container">
+                <img src="dashboard.png" alt="Tableau de bord AnesLog">
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════ PAGE 5 — CAPTURES (2/2) ══════════════ -->
+    <div class="page content-page">
+        <div class="page-label">03 — L'application (suite)</div>
+        <h2 class="page-title">Suivi des compétences et carnet de bord</h2>
+        <div class="divider"></div>
+
+        <div class="two-screenshots">
+            <div class="screenshot-block">
+                <div class="screenshot-label">Progression DESAR</div>
+                <p class="screenshot-desc" style="font-size: 12px;">Suivi domaine par domaine de la maquette nationale
+                    avec indicateurs de progression et phase actuelle.</p>
+                <div class="screenshot-container">
+                    <img src="progression.png" alt="Progression DESAR">
+                </div>
+            </div>
+            <div class="screenshot-block">
+                <div class="screenshot-label">Carnet de bord</div>
+                <p class="screenshot-desc" style="font-size: 12px;">Historique filtrable de tous les actes logués avec
+                    catégorie, procédure et niveau d'autonomie.</p>
+                <div class="screenshot-container">
+                    <img src="carnet.png" alt="Carnet de bord">
+                </div>
+            </div>
+        </div>
+
+        <div style="margin-top: 22px;">
+            <div class="screenshot-block">
+                <div class="screenshot-label">Gestion des semestres</div>
+                <p class="screenshot-desc" style="font-size: 12px;">Timeline complète des 10 semestres avec lieux de
+                    stage, service et phases du parcours DESAR.</p>
+                <div class="screenshot-container">
+                    <img src="semestres.png" alt="Gestion des semestres">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════ PAGE 6 — VALEUR AJOUTÉE ══════════════ -->
+    <div class="page content-page">
+        <div class="page-label">04 — Valeur ajoutée</div>
+        <h2 class="page-title">Pourquoi adopter AnesLog ?</h2>
+        <div class="divider"></div>
+
+        <div class="value-grid">
+            <div class="value-card">
+                <h3>
+                    <svg fill="none" stroke="var(--blue)" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                            d="M12 14l9-5-9-5-9 5 9 5z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                            d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
+                    </svg>
+                    Pour les internes
+                </h3>
+                <ul>
+                    <li>Loguer un acte en moins de 30 secondes</li>
+                    <li>Visualiser sa progression en temps réel</li>
+                    <li>Situer précisément son avancement dans la maquette</li>
+                    <li>Exporter ses données pour le portfolio DES</li>
+                    <li>Ne plus jamais perdre ses traces d'apprentissage</li>
+                </ul>
+            </div>
+
+            <div class="value-card">
+                <h3>
+                    <svg fill="none" stroke="var(--teal)" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    Pour les coordinateurs
+                </h3>
+                <ul>
+                    <li>Vision globale de tous les internes du DES</li>
+                    <li>Identifier les lacunes dans la formation</li>
+                    <li>Données structurées pour les commissions de DES</li>
+                    <li>Suivi conforme à la maquette officielle</li>
+                    <li>Diminuer la charge administrative</li>
+                </ul>
+            </div>
+
+            <div class="value-card">
+                <h3>
+                    <svg fill="none" stroke="#7C3AED" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                            d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                    Pour les équipes
+                </h3>
+                <ul>
+                    <li>Les séniors valident la maîtrise des procédures</li>
+                    <li>Gestion d'une équipe de résidents</li>
+                    <li>Catégories et procédures personnalisables par équipe</li>
+                    <li>Communication améliorée interne-sénior</li>
+                    <li>Meilleure traçabilité pédagogique</li>
+                </ul>
+            </div>
+
+            <div class="value-card">
+                <h3>
+                    <svg fill="none" stroke="#D97706" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                            d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                    Techniquement
+                </h3>
+                <ul>
+                    <li>Application web, aucune installation requise</li>
+                    <li>Accessible sur ordinateur, tablette, smartphone</li>
+                    <li>Données sécurisées et hébergées en France</li>
+                    <li>Interface moderne et performante</li>
+                    <li>Évolutions régulières basées sur les retours terrain</li>
+                </ul>
+            </div>
+        </div>
+
+        <table class="comparison-table">
+            <thead>
+                <tr>
+                    <th style="width: 40%;">Fonctionnalité</th>
+                    <th style="width: 20%;">Papier / Excel</th>
+                    <th style="width: 20%;">e-Portfolio générique</th>
+                    <th style="width: 20%;">AnesLog</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Conforme maquette DESAR 2017</td>
+                    <td class="cross">—</td>
+                    <td class="cross">—</td>
+                    <td class="check">Oui</td>
+                </tr>
+                <tr>
+                    <td>Suivi des niveaux d'autonomie</td>
+                    <td class="cross">—</td>
+                    <td class="cross">—</td>
+                    <td class="check">Oui</td>
+                </tr>
+                <tr>
+                    <td>Progression par domaine de compétence</td>
+                    <td class="cross">—</td>
+                    <td>Partiel</td>
+                    <td class="check">Oui</td>
+                </tr>
+                <tr>
+                    <td>Validation par les séniors</td>
+                    <td class="cross">—</td>
+                    <td class="cross">—</td>
+                    <td class="check">Oui</td>
+                </tr>
+                <tr>
+                    <td>Accessible mobile et web</td>
+                    <td class="cross">—</td>
+                    <td class="check">Oui</td>
+                    <td class="check">Oui</td>
+                </tr>
+                <tr>
+                    <td>Spécifique anesthésie-réanimation</td>
+                    <td class="cross">—</td>
+                    <td class="cross">—</td>
+                    <td class="check">Oui</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ══════════════ PAGE 7 — CONTACT ══════════════ -->
+    <div class="page cta-page">
+        <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+            <h2>Moderniser le suivi<br>de vos internes DESAR</h2>
+            <p>AnesLog est disponible dès maintenant. Nous serions ravis de vous proposer une démonstration
+                personnalisée et d'adapter l'outil à vos besoins.</p>
+
+            <div class="cta-box">
+                <h3>Nous contacter</h3>
+                <div class="cta-contact">
+                    <div>
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                                d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        <span>sacha.rozencwajg@gmail.com</span>
+                    </div>
+                    <div>
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                                d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                        </svg>
+                        <span>aneslog.fr</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="deploy-note">
+                <h4>Déploiement rapide</h4>
+                <p>AnesLog peut être opérationnel pour votre promotion en quelques jours. Un accompagnement à la prise
+                    en main est inclus pour les coordinateurs et les internes.</p>
+            </div>
+        </div>
+
+        <div class="cta-footer">
+            <p>AnesLog — Conçu pour la formation en Anesthésie-Réanimation · 2026</p>
+        </div>
+    </div>
+
+</body>
+
+</html>

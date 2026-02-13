@@ -60,8 +60,9 @@
                           {% if not selected_autonomy %}bg-primary-600 text-white shadow-sm{% else %}bg-surface-50 text-gray-500 border border-surface-200 hover:border-primary-300 hover:text-primary-600{% endif %}">
                     Tous
                 </a>
-                {% for level, color_class in [("J'ai vu", "bg-amber-400"), ("J'ai fait avec aide", "bg-blue-400"), ("Je
-                sais faire", "bg-emerald-400"), ("Je suis autonome", "bg-green-500")] %}
+                {% for level, color_class in [("Observé", "bg-amber-400"), ("Assisté", "bg-blue-400"), ("Supervisé",
+                "bg-emerald-400"), ("Autonome", "bg-green-500"), ("Participé", "bg-orange-400"), ("Géré", "bg-red-400")]
+                %}
                 {% set is_active = selected_autonomy == level %}
                 <a href="/mon-carnet?autonomie={{ level|urlencode }}{% if selected_category %}&categorie={{ selected_category }}{% endif %}"
                     class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all
@@ -86,13 +87,17 @@
             <div x-show="!editing" class="p-4">
                 <div class="flex items-start gap-3">
                     <div class="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0
-                        {% if log.autonomy_level.value == 'Je suis autonome' %}bg-green-100 text-green-700
-                        {% elif log.autonomy_level.value == 'Je sais faire' %}bg-emerald-100 text-emerald-700
-                        {% elif log.autonomy_level.value == " J'ai fait avec aide" %}bg-blue-100 text-blue-700 {% else
-                        %}bg-amber-100 text-amber-700{% endif %}">
-                        {% if log.autonomy_level.value == 'Je suis autonome' %}✓
-                        {% elif log.autonomy_level.value == 'Je sais faire' %}◉
-                        {% elif log.autonomy_level.value == "J'ai fait avec aide" %}◎
+                        {% if log.autonomy_level == 'Autonome' %}bg-green-100 text-green-700
+                        {% elif log.autonomy_level == 'Supervisé' %}bg-emerald-100 text-emerald-700
+                        {% elif log.autonomy_level == 'Assisté' %}bg-blue-100 text-blue-700
+                        {% elif log.autonomy_level == 'Géré' %}bg-red-100 text-red-700
+                        {% elif log.autonomy_level == 'Participé' %}bg-orange-100 text-orange-700
+                        {% else %}bg-amber-100 text-amber-700{% endif %}">
+                        {% if log.autonomy_level == 'Autonome' %}✓
+                        {% elif log.autonomy_level == 'Supervisé' %}◉
+                        {% elif log.autonomy_level == 'Assisté' %}◎
+                        {% elif log.autonomy_level == 'Géré' %}⚡
+                        {% elif log.autonomy_level == 'Participé' %}◎
                         {% else %}○{% endif %}
                     </div>
                     <div class="flex-1 min-w-0">
@@ -105,11 +110,13 @@
                     </div>
                     <div class="flex items-center gap-1">
                         <span class="hidden sm:inline text-xs px-2 py-1 rounded-full
-                            {% if log.autonomy_level.value == 'Je suis autonome' %}badge-autonomous
-                            {% elif log.autonomy_level.value == 'Je sais faire' %}badge-capable
-                            {% elif log.autonomy_level.value == " J'ai fait avec aide" %}badge-assisted {% else
-                            %}badge-observed{% endif %}">
-                            {{ log.autonomy_level.value }}
+                            {% if log.autonomy_level == 'Autonome' %}badge-autonomous
+                            {% elif log.autonomy_level == 'Supervisé' %}badge-capable
+                            {% elif log.autonomy_level == 'Assisté' %}badge-assisted
+                            {% elif log.autonomy_level == 'Géré' %}bg-red-100 text-red-700
+                            {% elif log.autonomy_level == 'Participé' %}bg-orange-100 text-orange-700
+                            {% else %}badge-observed{% endif %}">
+                            {{ log.autonomy_level }}
                         </span>
                         <button @click="editing = true"
                             class="p-1.5 text-gray-400 hover:text-primary-600 rounded-lg hover:bg-primary-50 transition"
@@ -151,10 +158,18 @@
                         <label class="block text-xs text-gray-500 mb-1">Niveau d'autonomie</label>
                         <select name="autonomy_level" required
                             class="w-full px-3 py-2 rounded-lg border border-surface-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-300">
-                            {% for level in autonomy_levels %}
-                            <option value="{{ level.value }}" {% if level.value==log.autonomy_level.value %}selected{%
-                                endif %}>{{ level.value }}</option>
-                            {% endfor %}
+                            <optgroup label="Interventions / Gestes">
+                                {% for level in autonomy_levels %}
+                                <option value="{{ level.value }}" {% if level.value==log.autonomy_level %}selected{%
+                                    endif %}>{{ level.value }}</option>
+                                {% endfor %}
+                            </optgroup>
+                            <optgroup label="Complications">
+                                {% for role in complication_roles %}
+                                <option value="{{ role.value }}" {% if role.value==log.autonomy_level %}selected{% endif
+                                    %}>{{ role.value }}</option>
+                                {% endfor %}
+                            </optgroup>
                         </select>
                     </div>
                     <div>
