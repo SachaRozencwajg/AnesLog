@@ -30,6 +30,16 @@ def run_postgres_migrations():
                 conn.commit()
                 print("Migration: 'is_active' column added.")
 
+            # Check users.desar_start_date
+            result = conn.execute(text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name='users' AND column_name='desar_start_date';"
+            ))
+            if not result.fetchone():
+                print("Migration: Adding 'desar_start_date' column to users table.")
+                conn.execute(text("ALTER TABLE users ADD COLUMN desar_start_date DATE;"))
+                conn.commit()
+
             # Check teams table
             try:
                 conn.execute(text("SELECT 1 FROM teams LIMIT 1;"))
