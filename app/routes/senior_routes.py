@@ -682,14 +682,19 @@ def resident_detail(
 
 
 def _compute_resident_lc_cusum(db: Session, resident_id: int) -> list[dict]:
-    """Compute LC-CUSUM for each procedure that has logs for this resident."""
+    """Compute LC-CUSUM for each gesture-type procedure that has logs for this resident."""
     from app.utils.autonomy import compute_lc_cusum
     from collections import defaultdict
     
-    # Get all logs grouped by procedure
+    # Get all logs for gesture-section procedures only (LC-CUSUM is for technical gestures)
     all_logs = (
         db.query(ProcedureLog)
-        .filter(ProcedureLog.user_id == resident_id)
+        .join(Procedure, ProcedureLog.procedure_id == Procedure.id)
+        .join(Category, Procedure.category_id == Category.id)
+        .filter(
+            ProcedureLog.user_id == resident_id,
+            Category.section == "gesture",
+        )
         .order_by(ProcedureLog.date.asc())
         .all()
     )

@@ -436,6 +436,10 @@ async def add_log(
         for pid_str, auto in zip(procedure_ids, procedure_autonomies):
             plog = make_log(int(pid_str), auto, CaseType.intervention)
             if plog:
+                # Read per-gesture success (radio: procedure_success_{id})
+                success_val = form.get(f"procedure_success_{pid_str}")
+                if success_val is not None:
+                    plog.is_success = success_val == "true"
                 db.add(plog)
                 logged_proc_ids.add(int(pid_str))
 
@@ -468,6 +472,10 @@ async def add_log(
         for pid_str, auto in zip(procedure_ids, procedure_autonomies):
             plog = make_log(int(pid_str), auto, CaseType.reanimation)
             if plog:
+                # Read per-gesture success (radio: rea_procedure_success_{id})
+                success_val = form.get(f"rea_procedure_success_{pid_str}")
+                if success_val is not None:
+                    plog.is_success = success_val == "true"
                 db.add(plog)
                 logged_proc_ids.add(int(pid_str))
 
@@ -480,6 +488,10 @@ async def add_log(
         log = make_log(int(gesture_id), gesture_autonomy, CaseType.standalone_gesture)
         if not log:
             raise HTTPException(400, "Geste invalide.")
+        # Read gesture success
+        gesture_success = form.get("gesture_success")
+        if gesture_success is not None:
+            log.is_success = gesture_success == "true"
         db.add(log)
         logged_proc_ids.add(int(gesture_id))
 

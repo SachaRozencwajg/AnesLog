@@ -231,7 +231,7 @@ def compute_lc_cusum(logs: list[ProcedureLog], p0: float = 0.3, p1: float = 0.1)
     data_points = []
     
     for i, log in enumerate(logs):
-        # Determine success: prefer senior-validated is_success, fallback to autonomy
+        # Determine success: use resident-declared is_success, fallback to autonomy level
         if log.is_success is not None:
             success = log.is_success
         else:
