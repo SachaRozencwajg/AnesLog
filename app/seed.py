@@ -54,54 +54,79 @@ COMPETENCY_DOMAINS = [
 # Competencies within each domain (~30 loggable competencies)
 # ---------------------------------------------------------------------------
 COMPETENCIES = {
+    # ── Domain A ─────────────────────────────────────────────────────
+    # Évaluer le risque opératoire, présenter une prémédication,
+    # préparer le patient à l'opération et l'informer
     "A": [
-        {"name": "Consultation pré-anesthésique", "description": "Évaluation complète du patient, rapport bénéfice-risque"},
-        {"name": "Stratification du risque", "description": "Classification ASA, scores de risque (Lee, Apfel)"},
-        {"name": "Gestion des traitements", "description": "Jeûne, prémédication, gestion des anticoagulants"},
+        {"name": "Examen pré-opératoire", "description": "Évaluation complète du patient avant intervention"},
+        {"name": "Classification de risque opératoire", "description": "ASA, scores de risque (Lee, Apfel)"},
+        {"name": "Risque allergique", "description": "Dépistage, bilan allergologique, prévention"},
+        {"name": "Examens complémentaires et gestion péri-opératoire des médicaments", "description": "Stratégie anesthésique, gestion des anticoagulants"},
+        {"name": "Règles du jeûne préopératoire", "description": "Adulte et enfant, prémédication"},
     ],
+    # ── Domain B ─────────────────────────────────────────────────────
+    # Conduire une anesthésie générale
     "B": [
-        {"name": "Intubation orotrachéale", "description": "IOT standard, séquence rapide"},
-        {"name": "Intubation difficile", "description": "Algorithme ID, vidéolaryngoscope, fibroscope"},
-        {"name": "Masque laryngé", "description": "Insertion et gestion du ML"},
-        {"name": "Induction anesthésique", "description": "Induction IV, inhalatoire, objectifs hémodynamiques"},
-        {"name": "Ventilation mécanique peropératoire", "description": "Réglages du respirateur, ventilation protectrice"},
-        {"name": "Monitorage peropératoire", "description": "Scope, SpO2, EtCO2, monitorage invasif"},
+        {"name": "Vérifications et procédures de contrôle", "description": "Check-list avant acte interventionnel sous anesthésie"},
+        {"name": "Contrôle des voies aériennes", "description": "IOT, intubation difficile, masque laryngé, algorithme ID"},
+        {"name": "Appareils d'anesthésie", "description": "Vérification, principes de fonctionnement, modes de ventilation, panne"},
+        {"name": "Posture et installation du patient", "description": "Surveillance, complications positionnelles"},
+        {"name": "Surveillance d'une anesthésie", "description": "Profondeur de l'anesthésie, BIS, signes cliniques"},
+        {"name": "Monitorage de base en anesthésie", "description": "SpO2, capnométrie, ECG, PA"},
+        {"name": "Différents types d'induction", "description": "En urgence, en l'absence de voie veineuse, inhalatoire"},
+        {"name": "Besoins liquidiens per-opératoires", "description": "Remplissage, solutés, objectifs hémodynamiques"},
+        {"name": "Hypothermie", "description": "Prévention, moyens de réchauffement, conséquences"},
     ],
+    # ── Domain C ─────────────────────────────────────────────────────
+    # Conduire le réveil de l'anesthésie
     "C": [
-        {"name": "Prise en charge en SSPI", "description": "Score d'Aldrete, critères de sortie"},
-        {"name": "Gestion des NVPO", "description": "Prophylaxie et traitement des nausées-vomissements"},
-        {"name": "Complications post-op immédiates", "description": "Hypothermie, frissons, douleur aiguë"},
+        {"name": "Physiopathologie du réveil", "description": "Surveillance, incidents-accidents, score d'Aldrete"},
+        {"name": "Nausées et vomissements post-opératoires", "description": "Prévention et traitement des NVPO"},
     ],
+    # ── Domain D ─────────────────────────────────────────────────────
+    # Pratiquer une anesthésie loco-régionale
     "D": [
-        {"name": "Rachianesthésie", "description": "Technique, indications, complications"},
-        {"name": "Péridurale", "description": "APD lombaire et thoracique"},
-        {"name": "Bloc périphérique échoguidé", "description": "Blocs des membres supérieurs et inférieurs"},
-        {"name": "Pharmacologie des AL", "description": "Toxicité des AL, doses maximales, intralipides"},
+        {"name": "Pharmacologie des anesthésiques locaux", "description": "Toxicité des AL, doses maximales, intralipides"},
+        {"name": "Techniques d'ALR", "description": "Rachidienne, péridurale, caudale, blocs périphériques"},
+        {"name": "Gestion des complications de l'ALR", "description": "Rachianesthésie totale, toxicité systémique, hématome"},
     ],
+    # ── Domain E ─────────────────────────────────────────────────────
+    # Gérer la douleur pendant et dans les suites d'une opération
     "E": [
-        {"name": "Analgésie multimodale", "description": "Protocoles d'analgésie postopératoire"},
-        {"name": "Titration morphinique", "description": "PCA, analgésie intraveineuse"},
+        {"name": "Morphiniques et antagonistes", "description": "Utilisation et prescription, PCA"},
+        {"name": "Antalgiques non morphiniques", "description": "Paracétamol, AINS, néfopam, kétamine"},
+        {"name": "Anti-hyperalgésiques", "description": "Prévention de l'hyperalgésie, kétamine, gabapentinoïdes"},
+        {"name": "Évaluation de la douleur", "description": "Échelles, douleur post-opératoire, physiopathologie"},
+        {"name": "Monitorage de l'analgésie", "description": "ANI, pupillométrie, indices nociceptifs"},
+        {"name": "Douleur chronique", "description": "Chronification, prise en charge multidisciplinaire"},
     ],
+    # ── Domain F ─────────────────────────────────────────────────────
+    # Tenir compte des répercussions de l'anesthésie sur les grandes
+    # fonctions ; adapter la stratégie au terrain et au type de chirurgie
     "F": [
-        {"name": "Chirurgie thoracique", "description": "F.a — Ventilation unipulmonaire, DLT, bloqueur bronchique"},
-        {"name": "Chirurgie cardiovasculaire", "description": "F.b — CEC, protection myocardique, hémodynamique"},
-        {"name": "Neurochirurgie", "description": "F.c — PIC, neuroprotection, position assise"},
-        {"name": "Métabolisme & endocrinien", "description": "F.d — Diabète, dysthyroïdie, insuffisance surrénale"},
-        {"name": "Hémostase & transfusion", "description": "F.e — Transfusion, hémovigilance, CIVD, thromboélastographie"},
-        {"name": "Obstétrique", "description": "F.f — Césarienne, APD obstétricale, hémorragie du post-partum"},
-        {"name": "Pédiatrie", "description": "F.g — Particularités pharmacologiques, voies aériennes pédiatriques"},
-        {"name": "Chirurgie céphalique", "description": "F.h — ORL, ophtalmologie, intubation nasale"},
-        {"name": "Chirurgie digestive/uro/ortho", "description": "F.i — Laparoscopie, garrot, ciment"},
-        {"name": "Hors bloc opératoire", "description": "F.j — IRM, radiologie interventionnelle, endoscopie"},
+        {"name": "F.a — Fonction respiratoire", "description": "Insuffisant respiratoire, asthme, chirurgie thoracique, thoracoscopie, œsophage"},
+        {"name": "F.b — Fonction cardiovasculaire", "description": "Coronarien, troubles du rythme, IC, HTA, chirurgie cardiaque et vasculaire"},
+        {"name": "F.c — Neuro-anesthésie", "description": "PIC, traumatisme crânien, tumeur intracrânienne, mort encéphalique"},
+        {"name": "F.d — Rein et anesthésie", "description": "Fonction rénale, EER, transplantation rénale, chirurgie urologique"},
+        {"name": "F.e — Hémostase et anesthésie", "description": "Troubles de l'hémostase, transfusion, épargne sanguine"},
+        {"name": "F.f — Obstétrique", "description": "Césarienne, ALR obstétricale, toxémie, hémorragie de la délivrance"},
+        {"name": "F.g — Pédiatrie", "description": "Voies aériennes, apports hydro-électrolytiques, urgences digestives, ALR pédiatrique"},
+        {"name": "F.h — Chirurgie céphalique", "description": "ORL, ophtalmologie, maxillo-faciale, laser, endoscopies"},
+        {"name": "F.i — Chirurgie digestive/uro/ortho", "description": "Hanche, genou, lambeaux, occlusions, chirurgie hépatique, prostate"},
+        {"name": "F.j — Hors bloc opératoire", "description": "Endoscopies digestives, radiologie interventionnelle, neuroradiologie"},
     ],
+    # ── Domain G ─────────────────────────────────────────────────────
+    # Utiliser les ultrasons en anesthésie-réanimation
     "G": [
-        {"name": "ETT / ETO", "description": "Échocardiographie transthoracique et transœsophagienne"},
-        {"name": "Échographie pleuropulmonaire", "description": "Blue protocol, pneumothorax, épanchement"},
-        {"name": "Échographie d'abord vasculaire", "description": "Repérage veineux et artériel échoguidé"},
+        {"name": "Échocardiographie cardiaque", "description": "Fonction contractile, épanchement péricardique, conditions de charge"},
+        {"name": "Échographie pleuro-pulmonaire", "description": "Épanchement pleural, qualité et quantité"},
+        {"name": "Échographie abdominale", "description": "Épanchement liquidien, globe vésical"},
+        {"name": "Échographie vasculaire", "description": "Reconnaissance des vaisseaux, guidage de ponction"},
     ],
+    # ── CoBaTrICE (Réanimation) ──────────────────────────────────────
+    # Compétences communes avec le MIR (Journal Officiel 28 avril 2017)
     "COBA": [
-        # Full CoBaTrICE referential (Competency-based Training in Intensive Care Medicine)
-        {"name": "Patient en état grave — approche structurée", "description": "Identification, évaluation et traitement du patient avec défaillances viscérales"},
+        {"name": "Approche structurée du patient grave", "description": "Identification, évaluation et traitement des défaillances viscérales"},
         {"name": "Monitorage et examens complémentaires", "description": "Évaluer, monitorer, prescrire et interpréter les données"},
         {"name": "Défaillance rénale", "description": "Identification et prise en charge"},
         {"name": "Défaillance neurologique", "description": "Identification et prise en charge"},
@@ -109,8 +134,8 @@ COMPETENCIES = {
         {"name": "Défaillance pulmonaire", "description": "SDRA, ventilation protectrice"},
         {"name": "Défaillance hépato-digestive", "description": "Insuffisance hépatique, hémorragie digestive"},
         {"name": "Défaillance hématologique", "description": "CIVD, thrombopénie, transfusion"},
-        {"name": "Sepsis et antibiothérapie", "description": "Identification, antibiothérapie, Surviving Sepsis Campaign"},
-        {"name": "Intoxications", "description": "Médicaments et toxines environnementales"},
+        {"name": "Sepsis et antibiothérapie", "description": "Identification, Surviving Sepsis Campaign"},
+        {"name": "Intoxications", "description": "Médicamenteuses et toxines environnementales"},
         {"name": "Complications du péripartum", "description": "Mise en danger de la vie de la mère"},
         {"name": "Antibiothérapie en réanimation", "description": "Spécificités, pharmacocinétique"},
         {"name": "Produits sanguins labiles", "description": "Administration en toute sécurité"},
@@ -121,20 +146,16 @@ COMPETENCIES = {
         {"name": "Épuration extra-rénale", "description": "Hémodialyse, hémofiltration continue, sevrage"},
         {"name": "Troubles hydro-électrolytiques", "description": "Glucose, équilibre acido-basique"},
         {"name": "Nutrition en réanimation", "description": "Évaluation et mise en œuvre"},
-        {"name": "Patient chirurgical à haut risque", "description": "Soins pré et postopératoires, chirurgie cardiaque et neurochirurgie"},
+        {"name": "Patient chirurgical à haut risque", "description": "Soins péri-opératoires, chirurgie cardiaque et neurochirurgie"},
         {"name": "Transplantation d'organes", "description": "Soins du patient transplanté"},
         {"name": "Patient traumatisé", "description": "Soins pré et postopératoires"},
-        {"name": "Impact physique et psychologique", "description": "Minimiser les conséquences sur patients et familles"},
-        {"name": "Douleur et délire en réanimation", "description": "Évaluation, prévention et traitement"},
-        {"name": "Sédation et curarisation", "description": "Gestion de la sédation et du blocage neuromusculaire"},
-        {"name": "Continuité des soins", "description": "Information des soignants, patients et proches"},
-        {"name": "Sortie de réanimation", "description": "Gestion sécurisée et opportune"},
-        {"name": "Limitation de traitement", "description": "Éthique, collaboration multidisciplinaire"},
-        {"name": "Soins de fin de vie", "description": "Entretien avec patients, familles et représentants"},
-        {"name": "Soins palliatifs en réanimation", "description": "Gestion palliative du patient grave"},
-        {"name": "Mort encéphalique", "description": "Diagnostic et réanimation du patient"},
-        {"name": "Don d'organes", "description": "Soutien psychologique de la famille du donneur"},
-        {"name": "Transport du patient grave", "description": "En dehors de l'unité de réanimation"},
+        {"name": "Conséquences physiques et psychologiques", "description": "Minimiser l'impact sur patients et familles"},
+        {"name": "Soins de fin de vie et limitation thérapeutique", "description": "Éthique, entretien avec familles, collaboration multidisciplinaire"},
+        {"name": "Arrêt cardiaque récent", "description": "Gestion et réanimation cardio-pulmonaire"},
+        {"name": "Urgences vitales et procédures de secours", "description": "Prise en charge immédiate"},
+        {"name": "Sédation et analgésie en réanimation", "description": "Évaluation, prévention du délire, curarisation"},
+        {"name": "Transport du patient critique", "description": "Transport sécurisé en dehors de l'unité"},
+        {"name": "Gestion d'afflux de victimes", "description": "Accidents à nombreuses victimes, plan blanc"},
     ],
 }
 
@@ -349,7 +370,13 @@ DEMO_USERS = [
 
 
 def seed_competency_domains(db):
-    """Seed the 7+1 DESAR competency domains and ~30 competencies."""
+    """Seed the 7+1 DESAR competency domains and their competencies.
+    
+    On each run the competency list is reconciled with the reference
+    COMPETENCIES dict: new items are added and stale items (names that
+    no longer appear in the reference) are removed so the DB always
+    matches the official maquette.
+    """
     print("\n📚 Seeding DESAR competency domains...")
     
     domain_map = {}  # code → CompetencyDomain object
@@ -369,13 +396,27 @@ def seed_competency_domains(db):
             print(f"  ✓ Domaine existant: {existing.code}")
     
     # Seed competencies within each domain
-    print("\n📋 Seeding competencies...")
+    print("\n📋 Syncing competencies with official maquette...")
     competency_map = {}  # (domain_code, name) → Competency
     
     for domain_code, competencies in COMPETENCIES.items():
         domain = domain_map.get(domain_code)
         if not domain:
             continue
+
+        # Build set of reference names for this domain
+        reference_names = {c["name"] for c in competencies}
+
+        # Remove stale competencies (names no longer in the maquette)
+        existing_comps = db.query(Competency).filter(
+            Competency.domain_id == domain.id,
+        ).all()
+        for ec in existing_comps:
+            if ec.name not in reference_names:
+                db.delete(ec)
+                print(f"    − Supprimé: {domain_code}.{ec.name}")
+
+        # Upsert current competencies
         for i, comp_data in enumerate(competencies, 1):
             existing = db.query(Competency).filter(
                 Competency.domain_id == domain.id,
@@ -393,6 +434,9 @@ def seed_competency_domains(db):
                 competency_map[(domain_code, comp.name)] = comp
                 print(f"    + {domain_code}.{comp.name}")
             else:
+                # Update display_order and description if changed
+                existing.display_order = i
+                existing.description = comp_data.get("description", existing.description)
                 competency_map[(domain_code, existing.name)] = existing
     
     db.commit()
