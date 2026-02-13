@@ -34,13 +34,23 @@ class UserRole(str, enum.Enum):
 
 class AutonomyLevel(str, enum.Enum):
     """
-    Level of autonomy the resident had during the procedure.
-    Values are stored in French to match the UI display.
+    Level of autonomy during an intervention or technical gesture.
+    Based on EPA (Entrustable Professional Activities) framework.
     """
-    observed = "J'ai vu"
-    assisted = "J'ai fait avec aide"
-    capable = "Je sais faire"
-    autonomous = "Je suis autonome"
+    observed = "Observé"
+    assisted = "Assisté"
+    supervised = "Supervisé"
+    autonomous = "Autonome"
+
+
+class ComplicationRole(str, enum.Enum):
+    """
+    Level of involvement in a post-operative complication.
+    Separate from AutonomyLevel because complications have different semantics.
+    """
+    observed = "Observé"
+    participated = "Participé"
+    managed = "Géré"
 
 
 class InvitationStatus(str, enum.Enum):
@@ -60,6 +70,14 @@ class GuardType(str, enum.Enum):
     """Type of guard shift."""
     garde_24h = "Garde 24h"
     astreinte = "Astreinte"
+
+
+class CaseType(str, enum.Enum):
+    """Type of clinical case being logged."""
+    consultation = "consultation"       # Pre-op assessment (domain A)
+    intervention = "intervention"       # OR case (default, existing)
+    reanimation = "reanimation"         # ICU case (CoBaTrICE)
+    standalone_gesture = "geste"        # Standalone gesture (no parent case)
 
 
 # ---------------------------------------------------------------------------
@@ -225,8 +243,9 @@ class ProcedureLog(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     procedure_id = Column(Integer, ForeignKey("procedures.id"), nullable=False)
     date = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    autonomy_level = Column(SAEnum(AutonomyLevel), nullable=True)  # Nullable: not asked when mastered
+    autonomy_level = Column(String(50), nullable=True)  # Stores AutonomyLevel or ComplicationRole value
     case_id = Column(String(36), nullable=True, index=True) # Grouping ID for multi-procedure cases
+    case_type = Column(SAEnum(CaseType), default=CaseType.intervention, nullable=False)
     notes = Column(Text, nullable=True)
     is_success = Column(Boolean, nullable=True)  # Senior-validated objective success
     surgery_type = Column(String(100), nullable=True)  # Type of surgery (maps to F.a-F.j)

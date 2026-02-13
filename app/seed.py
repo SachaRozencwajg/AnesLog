@@ -15,8 +15,8 @@ from datetime import datetime, timedelta, timezone, date
 from app.database import engine, SessionLocal, Base
 from app.models import (
     User, Category, Procedure, ProcedureLog, UserRole, Team, AutonomyLevel,
-    CompetencyDomain, Competency, DesarPhase, Semester, GuardLog, GuardType,
-    ProcedureCompetence,
+    ComplicationRole, CompetencyDomain, Competency, DesarPhase, Semester,
+    GuardLog, GuardType, ProcedureCompetence, CaseType,
 )
 from app.auth import hash_password
 
@@ -100,12 +100,41 @@ COMPETENCIES = {
         {"name": "Échographie d'abord vasculaire", "description": "Repérage veineux et artériel échoguidé"},
     ],
     "COBA": [
+        # Full CoBaTrICE referential (Competency-based Training in Intensive Care Medicine)
+        {"name": "Patient en état grave — approche structurée", "description": "Identification, évaluation et traitement du patient avec défaillances viscérales"},
+        {"name": "Monitorage et examens complémentaires", "description": "Évaluer, monitorer, prescrire et interpréter les données"},
+        {"name": "Défaillance rénale", "description": "Identification et prise en charge"},
+        {"name": "Défaillance neurologique", "description": "Identification et prise en charge"},
+        {"name": "Défaillance cardiocirculatoire", "description": "État de choc, catécholamines, monitorage"},
+        {"name": "Défaillance pulmonaire", "description": "SDRA, ventilation protectrice"},
+        {"name": "Défaillance hépato-digestive", "description": "Insuffisance hépatique, hémorragie digestive"},
+        {"name": "Défaillance hématologique", "description": "CIVD, thrombopénie, transfusion"},
+        {"name": "Sepsis et antibiothérapie", "description": "Identification, antibiothérapie, Surviving Sepsis Campaign"},
+        {"name": "Intoxications", "description": "Médicaments et toxines environnementales"},
+        {"name": "Complications du péripartum", "description": "Mise en danger de la vie de la mère"},
+        {"name": "Antibiothérapie en réanimation", "description": "Spécificités, pharmacocinétique"},
+        {"name": "Produits sanguins labiles", "description": "Administration en toute sécurité"},
+        {"name": "Remplissage et vasopresseurs", "description": "Solutés, médicaments vasomoteurs et inotropes"},
+        {"name": "Assistance circulatoire mécanique", "description": "ECMO, contre-pulsion, Impella"},
         {"name": "Ventilation invasive", "description": "Intubation, réglages ventilatoires, sevrage"},
         {"name": "Ventilation non invasive", "description": "VNI, OHD, CPAP"},
-        {"name": "Défaillance hémodynamique", "description": "État de choc, catécholamines, monitorage"},
-        {"name": "Épuration extra-rénale", "description": "Hémodialyse, hémofiltration continue"},
-        {"name": "Sepsis grave", "description": "Identification, antibiothérapie, Surviving Sepsis Campaign"},
-        {"name": "Limitation de traitement", "description": "Éthique, fin de vie, mort encéphalique, don d'organes"},
+        {"name": "Épuration extra-rénale", "description": "Hémodialyse, hémofiltration continue, sevrage"},
+        {"name": "Troubles hydro-électrolytiques", "description": "Glucose, équilibre acido-basique"},
+        {"name": "Nutrition en réanimation", "description": "Évaluation et mise en œuvre"},
+        {"name": "Patient chirurgical à haut risque", "description": "Soins pré et postopératoires, chirurgie cardiaque et neurochirurgie"},
+        {"name": "Transplantation d'organes", "description": "Soins du patient transplanté"},
+        {"name": "Patient traumatisé", "description": "Soins pré et postopératoires"},
+        {"name": "Impact physique et psychologique", "description": "Minimiser les conséquences sur patients et familles"},
+        {"name": "Douleur et délire en réanimation", "description": "Évaluation, prévention et traitement"},
+        {"name": "Sédation et curarisation", "description": "Gestion de la sédation et du blocage neuromusculaire"},
+        {"name": "Continuité des soins", "description": "Information des soignants, patients et proches"},
+        {"name": "Sortie de réanimation", "description": "Gestion sécurisée et opportune"},
+        {"name": "Limitation de traitement", "description": "Éthique, collaboration multidisciplinaire"},
+        {"name": "Soins de fin de vie", "description": "Entretien avec patients, familles et représentants"},
+        {"name": "Soins palliatifs en réanimation", "description": "Gestion palliative du patient grave"},
+        {"name": "Mort encéphalique", "description": "Diagnostic et réanimation du patient"},
+        {"name": "Don d'organes", "description": "Soutien psychologique de la famille du donneur"},
+        {"name": "Transport du patient grave", "description": "En dehors de l'unité de réanimation"},
     ],
 }
 
@@ -154,6 +183,22 @@ PROCEDURE_COMPETENCY_MAP = {
     "Révision pour hémostase": "F",
     "Insuffisance rénale aiguë (dialyse)": "COBA",
     "AVC périopératoire": "COBA",
+    # Consultations d'anesthésie → A
+    "Consultation pré-opératoire": "A",
+    "Visite pré-anesthésique": "A",
+    # Pathologies de réanimation → COBA
+    "Choc septique (réa)": "COBA",
+    "SDRA (réa)": "COBA",
+    "Choc cardiogénique (réa)": "COBA",
+    "Choc hémorragique (réa)": "COBA",
+    "Insuffisance rénale aiguë (réa)": "COBA",
+    "Intoxication médicamenteuse": "COBA",
+    "État de mal épileptique": "COBA",
+    "Polytraumatisme": "COBA",
+    "Hémorragie du post-partum": "COBA",
+    "Arrêt cardiaque (réa)": "COBA",
+    "Transplantation (réa)": "COBA",
+    "Mort encéphalique (réa)": "COBA",
 }
 
 # ---------------------------------------------------------------------------
@@ -172,6 +217,8 @@ SURGERY_TYPES = [
 CATEGORY_SECTIONS: dict[str, str] = {
     "Gestes techniques": "gesture",
     "Complications post-opératoire": "complication",
+    "Consultation d'anesthésie": "consultation",
+    "Pathologies de réanimation": "reanimation",
 }
 
 SEED_DATA: dict[str, list[str]] = {
@@ -208,6 +255,24 @@ SEED_DATA: dict[str, list[str]] = {
         "ALR périphérique (Sciatique poplité)",
         "ALR périphérique (Fémoral)",
         "ETO peropératoire"
+    ],
+    "Consultation d'anesthésie": [
+        "Consultation pré-opératoire",
+        "Visite pré-anesthésique",
+    ],
+    "Pathologies de réanimation": [
+        "Choc septique (réa)",
+        "SDRA (réa)",
+        "Choc cardiogénique (réa)",
+        "Choc hémorragique (réa)",
+        "Insuffisance rénale aiguë (réa)",
+        "Intoxication médicamenteuse",
+        "État de mal épileptique",
+        "Polytraumatisme",
+        "Hémorragie du post-partum",
+        "Arrêt cardiaque (réa)",
+        "Transplantation (réa)",
+        "Mort encéphalique (réa)",
     ],
     "Complications post-opératoire": [
         "Choc hémorragique",
@@ -658,8 +723,12 @@ def generate_fake_cases(db, user, cases_target):
         if complications and random.random() < complication_chance:
              num_comps = random.randint(1, 2)
              selected_comps = random.sample(complications, min(num_comps, len(complications)))
+             complication_roles = list(ComplicationRole)
+             # Weights for complications: Observé, Participé, Géré
+             # More experienced → more likely to have managed
+             comp_weights = case_weights[:3] if len(case_weights) >= 3 else [0.3, 0.4, 0.3]
              for c in selected_comps:
-                 c_autonomy = random.choices(autonomy_levels, weights=case_weights, k=1)[0]
+                 c_autonomy = random.choices(complication_roles, weights=comp_weights, k=1)[0]
                  db.add(ProcedureLog(
                     user_id=user.id,
                     procedure_id=c.id,

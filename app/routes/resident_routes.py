@@ -14,8 +14,9 @@ from sqlalchemy import func, extract, or_
 
 from app.database import get_db
 from app.models import (
-    User, Category, Procedure, ProcedureLog, AutonomyLevel, UserRole,
+    User, Category, Procedure, ProcedureLog, AutonomyLevel, ComplicationRole, UserRole,
     CompetencyDomain, Competency, Semester, GuardLog, GuardType, DesarPhase,
+    ProcedureCompetence,
 )
 from app.auth import get_current_user
 
@@ -144,6 +145,8 @@ def dashboard(
         "intervention": [],
         "gesture": [],
         "complication": [],
+        "consultation": [],
+        "reanimation": [],
     }
     for cat_name, data in sorted(_cat_map.items(), key=lambda x: -x[1]["count"]):
         category_stats_by_section[data["section"]].append({
@@ -177,7 +180,9 @@ def dashboard(
     grouped_sections = {
         "interventions": [],
         "gestures": [],
-        "complications": []
+        "complications": [],
+        "consultations": [],
+        "reanimation": [],
     }
     
     # Store procedures by category_id for easy lookup
@@ -197,6 +202,10 @@ def dashboard(
             grouped_sections["gestures"].append(cat)
         elif cat.section == "complication":
             grouped_sections["complications"].append(cat)
+        elif cat.section == "consultation":
+            grouped_sections["consultations"].append(cat)
+        elif cat.section == "reanimation":
+            grouped_sections["reanimation"].append(cat)
         else:
             grouped_sections["interventions"].append(cat)
 
@@ -223,12 +232,14 @@ def dashboard(
         else:
             curr = curr.replace(month=curr.month + 1)
 
-    # Map each log to its month bucket
-    month_autonomy_data = defaultdict(lambda: {level.value: 0 for level in AutonomyLevel})
+    # Map each log to its month bucket (handle both AutonomyLevel and ComplicationRole values)
+    all_level_values = [l.value for l in AutonomyLevel] + [r.value for r in ComplicationRole if r.value not in [l.value for l in AutonomyLevel]]
+    month_autonomy_data = defaultdict(lambda: {v: 0 for v in all_level_values})
     for log in temporal_logs:
         label = log.date.strftime("%b %Y")
-        if label in month_labels:
-            month_autonomy_data[label][log.autonomy_level.value] += 1
+        if label in month_labels and log.autonomy_level:
+            if log.autonomy_level in month_autonomy_data[label]:
+                month_autonomy_data[label][log.autonomy_level] += 1
 
     # Build chart-ready datasets
     temporal_chart = {
@@ -236,17 +247,20 @@ def dashboard(
         "datasets": []
     }
     colors = {
-        "J'ai vu": {"bg": "rgba(251, 191, 36, 0.7)", "border": "rgb(251, 191, 36)"},
-        "J'ai fait avec aide": {"bg": "rgba(96, 165, 250, 0.7)", "border": "rgb(96, 165, 250)"},
-        "Je sais faire": {"bg": "rgba(52, 211, 153, 0.7)", "border": "rgb(52, 211, 153)"},
-        "Je suis autonome": {"bg": "rgba(34, 197, 94, 0.7)", "border": "rgb(34, 197, 94)"},
+        "Observé": {"bg": "rgba(251, 191, 36, 0.7)", "border": "rgb(251, 191, 36)"},
+        "Assisté": {"bg": "rgba(96, 165, 250, 0.7)", "border": "rgb(96, 165, 250)"},
+        "Supervisé": {"bg": "rgba(52, 211, 153, 0.7)", "border": "rgb(52, 211, 153)"},
+        "Autonome": {"bg": "rgba(34, 197, 94, 0.7)", "border": "rgb(34, 197, 94)"},
+        "Participé": {"bg": "rgba(96, 165, 250, 0.7)", "border": "rgb(96, 165, 250)"},
+        "Géré": {"bg": "rgba(239, 68, 68, 0.7)", "border": "rgb(239, 68, 68)"},
     }
-    for level in AutonomyLevel:
+    for level_val in all_level_values:
+        c = colors.get(level_val, {"bg": "rgba(156, 163, 175, 0.7)", "border": "rgb(156, 163, 175)"})
         temporal_chart["datasets"].append({
-            "label": level.value,
-            "data": [month_autonomy_data[m][level.value] for m in month_labels],
-            "backgroundColor": colors[level.value]["bg"],
-            "borderColor": colors[level.value]["border"],
+            "label": level_val,
+            "data": [month_autonomy_data[m][level_val] for m in month_labels],
+            "backgroundColor": c["bg"],
+            "borderColor": c["border"],
             "borderWidth": 1,
             "borderRadius": 4,
         })
@@ -272,6 +286,8 @@ def dashboard(
         "intervention": [],
         "gesture": [],
         "complication": [],
+        "consultation": [],
+        "reanimation": [],
     }
     for cat in categories:
         sec = cat.section or "intervention"
@@ -290,6 +306,7 @@ def dashboard(
             "grouped_sections": grouped_sections,
             "procedures_by_cat_id": procedures_by_cat_id,
             "autonomy_levels": AutonomyLevel,
+            "complication_roles": ComplicationRole,
             "selected_category": category,
             "temporal_chart": temporal_chart,
             "mastered_procedure_ids": mastered_ids,
@@ -334,80 +351,144 @@ def get_procedures_by_category(
 # ---------------------------------------------------------------------------
 
 @router.post("/gestes/ajouter")
-def add_log(
+async def add_log(
     request: Request,
-    intervention_id: int = Form(...),
-    intervention_autonomy: str = Form(...),
-    
-    # Optional lists. FastAPI matches "procedure_ids" inputs into a list.
-    procedure_ids: list[int] = Form([]),
-    procedure_autonomies: list[str] = Form([]),
-    
-    complication_ids: list[int] = Form([]),
-    complication_autonomies: list[str] = Form([]),
-    
-    date: str = Form(...),
-    notes: str = Form(""),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Create a new Case (Intervention + optional Gestures + Complications)."""
+    """Create a new case — dispatches based on case_type."""
+    from app.models import CaseType
+    from app.utils.autonomy import check_and_update_mastery
+
+    form = await request.form()
+    case_type = form.get("case_type", "intervention")
+    date_str = form.get("date", "")
+    notes = form.get("notes", "") or None
+
     # Parse date
     try:
-        log_date = datetime.strptime(date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        log_date = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
     except ValueError:
         log_date = datetime.now(timezone.utc)
 
-    # Generate Case ID
+    # Generate shared Case ID
     case_uid = str(uuid.uuid4())
 
-    # Helper to create log
-    def create_log(pid, auto_level_str):
-        try:
-            level = AutonomyLevel(auto_level_str)
-        except ValueError:
-            return None
-        
-        # Verify proc exists/access
+    # All valid autonomy/role values
+    valid_values = {l.value for l in AutonomyLevel} | {r.value for r in ComplicationRole}
+
+    # Get current semester
+    from app.models import Semester
+    current_sem = db.query(Semester).filter(
+        Semester.user_id == user.id,
+        Semester.is_current == True,
+    ).first()
+    semester_id = current_sem.id if current_sem else None
+
+    # Helper to verify procedure access and create a log
+    def make_log(pid, auto_level_str, ct):
         proc = db.query(Procedure).filter(Procedure.id == pid).first()
-        if not proc: return None
-        if proc.team_id and proc.team_id != user.team_id: return None
-        
+        if not proc:
+            return None
+        if proc.team_id and proc.team_id != user.team_id:
+            return None
         return ProcedureLog(
             user_id=user.id,
             procedure_id=pid,
             date=log_date,
-            autonomy_level=level,
+            autonomy_level=auto_level_str if auto_level_str in valid_values else None,
             case_id=case_uid,
-            notes=notes if notes else None
+            case_type=ct,
+            notes=notes,
+            semester_id=semester_id,
         )
 
-    # 1. Intervention (Mandatory)
-    main_log = create_log(intervention_id, intervention_autonomy)
-    if not main_log:
-        raise HTTPException(400, "Intervention ou autonomie invalide.")
-    db.add(main_log)
+    logged_proc_ids = set()
 
-    # 2. Gestures (Optional)
-    # Zip IDs and Autonomies. The order is preserved by browser submission.
-    for pid, auto in zip(procedure_ids, procedure_autonomies):
-        plog = create_log(pid, auto)
-        if plog: db.add(plog)
+    # ── CONSULTATION ──────────────────────────────────────────────────
+    if case_type == "consultation":
+        consultation_id = form.get("consultation_id")
+        consultation_autonomy = form.get("consultation_autonomy", "Observé")
+        if not consultation_id:
+            raise HTTPException(400, "Type de consultation requis.")
+        log = make_log(int(consultation_id), consultation_autonomy, CaseType.consultation)
+        if not log:
+            raise HTTPException(400, "Consultation invalide.")
+        db.add(log)
+        logged_proc_ids.add(int(consultation_id))
 
-    # 3. Complications (Optional)
-    for pid, auto in zip(complication_ids, complication_autonomies):
-        plog = create_log(pid, auto)
-        if plog: db.add(plog)
+    # ── INTERVENTION (existing flow) ──────────────────────────────────
+    elif case_type == "intervention":
+        intervention_id = form.get("intervention_id")
+        intervention_autonomy = form.get("intervention_autonomy", "")
+        if not intervention_id:
+            raise HTTPException(400, "Intervention principale requise.")
+
+        main_log = make_log(int(intervention_id), intervention_autonomy, CaseType.intervention)
+        if not main_log:
+            raise HTTPException(400, "Intervention ou autonomie invalide.")
+        db.add(main_log)
+        logged_proc_ids.add(int(intervention_id))
+
+        # Gestures
+        procedure_ids = form.getlist("procedure_ids")
+        procedure_autonomies = form.getlist("procedure_autonomies")
+        for pid_str, auto in zip(procedure_ids, procedure_autonomies):
+            plog = make_log(int(pid_str), auto, CaseType.intervention)
+            if plog:
+                db.add(plog)
+                logged_proc_ids.add(int(pid_str))
+
+        # Complications
+        complication_ids = form.getlist("complication_ids")
+        complication_autonomies = form.getlist("complication_autonomies")
+        for pid_str, auto in zip(complication_ids, complication_autonomies):
+            plog = make_log(int(pid_str), auto, CaseType.intervention)
+            if plog:
+                db.add(plog)
+                logged_proc_ids.add(int(pid_str))
+
+    # ── REANIMATION ───────────────────────────────────────────────────
+    elif case_type == "reanimation":
+        pathology_id = form.get("pathology_id")
+        if not pathology_id:
+            raise HTTPException(400, "Pathologie principale requise.")
+
+        # Main pathology log → always "Supervisé" or user-chosen autonomy
+        rea_autonomy = form.get("rea_autonomy", "Supervisé")
+        main_log = make_log(int(pathology_id), rea_autonomy, CaseType.reanimation)
+        if not main_log:
+            raise HTTPException(400, "Pathologie invalide.")
+        db.add(main_log)
+        logged_proc_ids.add(int(pathology_id))
+
+        # Associated gestures (optional checkboxes)
+        procedure_ids = form.getlist("procedure_ids")
+        procedure_autonomies = form.getlist("procedure_autonomies")
+        for pid_str, auto in zip(procedure_ids, procedure_autonomies):
+            plog = make_log(int(pid_str), auto, CaseType.reanimation)
+            if plog:
+                db.add(plog)
+                logged_proc_ids.add(int(pid_str))
+
+    # ── STANDALONE GESTURE ────────────────────────────────────────────
+    elif case_type == "geste":
+        gesture_id = form.get("gesture_id")
+        gesture_autonomy = form.get("gesture_autonomy", "")
+        if not gesture_id:
+            raise HTTPException(400, "Geste technique requis.")
+        log = make_log(int(gesture_id), gesture_autonomy, CaseType.standalone_gesture)
+        if not log:
+            raise HTTPException(400, "Geste invalide.")
+        db.add(log)
+        logged_proc_ids.add(int(gesture_id))
+
+    else:
+        raise HTTPException(400, "Type de cas inconnu.")
 
     db.commit()
 
-    # Check if any procedure just crossed the mastery threshold
-    from app.utils.autonomy import check_and_update_mastery
-    logged_proc_ids = {intervention_id}
-    for pid in procedure_ids:
-        logged_proc_ids.add(pid)
-    for pid in complication_ids:
-        logged_proc_ids.add(pid)
+    # Check mastery thresholds
     for pid in logged_proc_ids:
         check_and_update_mastery(db, user.id, pid)
 
@@ -433,13 +514,9 @@ def logbook(
         query_proc_ids = db.query(Procedure.id).filter(Procedure.category_id == cat)
         query = query.filter(ProcedureLog.procedure_id.in_(query_proc_ids))
 
-    # Apply autonomy filter
+    # Apply autonomy filter (now stored as plain strings)
     if autonomy:
-        try:
-            level = AutonomyLevel(autonomy)
-            query = query.filter(ProcedureLog.autonomy_level == level)
-        except ValueError:
-            pass
+        query = query.filter(ProcedureLog.autonomy_level == autonomy)
 
     logs = query.order_by(ProcedureLog.date.desc()).all()
     # Filter categories by team
@@ -463,6 +540,7 @@ def logbook(
             "logs": logs,
             "categories": categories,
             "autonomy_levels": AutonomyLevel,
+            "complication_roles": ComplicationRole,
             "selected_category": cat,
             "selected_autonomy": autonomy,
             "total_count": total_count,
@@ -487,10 +565,10 @@ def edit_log(
     if not log:
         raise HTTPException(status_code=404, detail="Entrée non trouvée.")
 
-    try:
-        log.autonomy_level = AutonomyLevel(autonomy_level)
-    except ValueError:
+    valid_values = {l.value for l in AutonomyLevel} | {r.value for r in ComplicationRole}
+    if autonomy_level not in valid_values:
         raise HTTPException(status_code=400, detail="Niveau d'autonomie invalide.")
+    log.autonomy_level = autonomy_level
 
     try:
         log.date = datetime.strptime(date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
@@ -574,6 +652,14 @@ def progression(
             Procedure.competency_id.in_(comp_ids)
         ).all()
 
+        # Load ProcedureCompetence records for this user and these procedures
+        all_proc_ids = [p.id for p in domain_procs]
+        proc_comps = db.query(ProcedureCompetence).filter(
+            ProcedureCompetence.user_id == user.id,
+            ProcedureCompetence.procedure_id.in_(all_proc_ids) if all_proc_ids else False,
+        ).all()
+        proc_comp_map = {pc.procedure_id: pc for pc in proc_comps}
+
         # Count logs per competency for this user
         comp_details = []
         mastered = 0
@@ -588,29 +674,47 @@ def progression(
                 comp_details.append({
                     "competency": comp,
                     "log_count": 0,
-                    "autonomous_count": 0,
                     "status": "not_started",
+                    "status_label": "Non commencé",
+                    "acquisition_level": "not_started",
                     "procedures": comp_procs,
                 })
                 continue
 
-            # Count total logs and autonomous logs
+            # Count total logs
             log_count = db.query(func.count(ProcedureLog.id)).filter(
                 ProcedureLog.user_id == user.id,
                 ProcedureLog.procedure_id.in_(proc_ids),
             ).scalar() or 0
 
-            autonomous_count = db.query(func.count(ProcedureLog.id)).filter(
-                ProcedureLog.user_id == user.id,
-                ProcedureLog.procedure_id.in_(proc_ids),
-                ProcedureLog.autonomy_level == AutonomyLevel.autonomous,
-            ).scalar() or 0
+            # Derive acquisition status from per-procedure ProcedureCompetence
+            # Hierarchy: locked (Autonome) > mastered (Maîtrisé) > learning (En cours) > not_started
+            best_level = "not_started"
+            for pid in proc_ids:
+                pc = proc_comp_map.get(pid)
+                if pc and (pc.senior_validated or pc.is_pre_acquired):
+                    best_level = "locked"
+                    break  # Can't get better than locked
+                elif pc and pc.is_mastered:
+                    best_level = "mastered"
+                elif log_count > 0 and best_level == "not_started":
+                    best_level = "in_progress"
 
-            # Determine status
-            if autonomous_count >= 3:
+            # Map internal level to French labels
+            STATUS_LABELS = {
+                "locked": "Validé",
+                "mastered": "Maîtrisé",
+                "in_progress": "En cours",
+                "not_started": "Non commencé",
+            }
+
+            if best_level == "locked":
+                status = "mastered"  # counts as mastered for progress bar
+                mastered += 1
+            elif best_level == "mastered":
                 status = "mastered"
                 mastered += 1
-            elif log_count > 0:
+            elif best_level == "in_progress":
                 status = "in_progress"
                 in_progress += 1
             else:
@@ -619,8 +723,9 @@ def progression(
             comp_details.append({
                 "competency": comp,
                 "log_count": log_count,
-                "autonomous_count": autonomous_count,
                 "status": status,
+                "status_label": STATUS_LABELS[best_level],
+                "acquisition_level": best_level,  # raw level for styling
                 "procedures": comp_procs,
             })
 
@@ -641,10 +746,34 @@ def progression(
         GuardLog.user_id == user.id,
     ).scalar() or 0
 
-    # Total cases
-    total_cases = db.query(func.count(func.distinct(ProcedureLog.case_id))).filter(
+    # Total cases — count distinct case_ids for grouped types + individual rows for standalone
+    from app.models import CaseType
+
+    # Grouped cases (intervention & reanimation): each case_id counts once
+    grouped_cases = db.query(func.count(func.distinct(ProcedureLog.case_id))).filter(
         ProcedureLog.user_id == user.id,
         ProcedureLog.case_id != None,
+        ProcedureLog.case_type.in_([CaseType.intervention, CaseType.reanimation]),
+    ).scalar() or 0
+
+    # Standalone entries (consultations, standalone gestures): each row = 1 case
+    standalone_cases = db.query(func.count(ProcedureLog.id)).filter(
+        ProcedureLog.user_id == user.id,
+        ProcedureLog.case_type.in_([CaseType.consultation, CaseType.standalone_gesture]),
+    ).scalar() or 0
+
+    total_cases = grouped_cases + standalone_cases
+
+    # Per-type counts for stat cards
+    consultation_count = db.query(func.count(ProcedureLog.id)).filter(
+        ProcedureLog.user_id == user.id,
+        ProcedureLog.case_type == CaseType.consultation,
+    ).scalar() or 0
+
+    rea_count = db.query(func.count(func.distinct(ProcedureLog.case_id))).filter(
+        ProcedureLog.user_id == user.id,
+        ProcedureLog.case_id != None,
+        ProcedureLog.case_type == CaseType.reanimation,
     ).scalar() or 0
 
     # Determine current phase
@@ -660,6 +789,8 @@ def progression(
         "current_phase": current_phase,
         "guard_count": guard_count,
         "total_cases": total_cases,
+        "consultation_count": consultation_count,
+        "rea_count": rea_count,
     })
 
 

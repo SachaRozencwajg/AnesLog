@@ -271,6 +271,7 @@ def run_postgres_migrations():
                 # (table, column, definition)
                 ("procedure_logs", "surgery_type", "VARCHAR(100)"),
                 ("procedure_logs", "semester_id", "INTEGER REFERENCES semesters(id)"),
+                ("procedure_logs", "case_type", "VARCHAR(20) DEFAULT 'intervention' NOT NULL"),
                 ("procedures", "competency_id", "INTEGER REFERENCES competencies(id)"),
             ]
             for tbl, col, defn in _missing_columns:
