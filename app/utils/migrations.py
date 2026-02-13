@@ -158,10 +158,15 @@ def run_postgres_migrations():
                 conn.commit()
 
             # Make autonomy_level nullable (for mastered procedures)
-            conn.execute(text(
-                "ALTER TABLE procedure_logs ALTER COLUMN autonomy_level DROP NOT NULL;"
-            ))
-            conn.commit()
+            try:
+                conn.execute(text(
+                    "ALTER TABLE procedure_logs ALTER COLUMN autonomy_level DROP NOT NULL;"
+                ))
+                conn.commit()
+            except Exception as e:
+                print(f"DROP NOT NULL skipped (likely already nullable): {e}")
+                # Rollback the failed transaction so subsequent statements work
+                conn.rollback()
 
             # Create procedure_competences table
             conn.execute(text("""

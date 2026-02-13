@@ -104,6 +104,24 @@ app.include_router(senior_routes.router)
 app.include_router(profile_routes.router)
 
 
+@app.get("/health")
+def health_check(db: Session = Depends(get_db)):
+    """Debug endpoint: check DB connectivity and schema."""
+    from sqlalchemy import text, inspect
+    try:
+        db.execute(text("SELECT 1"))
+        inspector = inspect(engine)
+        cols = [c["name"] for c in inspector.get_columns("procedure_competences")] if "procedure_competences" in inspector.get_table_names() else []
+        return {
+            "status": "ok",
+            "db": "connected",
+            "procedure_competences_columns": cols,
+            "tables": inspector.get_table_names(),
+        }
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
+
+
 @app.get("/")
 def root(user: User | None = Depends(get_optional_user)):
     """Redirect root to dashboard or login."""
