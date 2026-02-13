@@ -237,7 +237,7 @@ def run_postgres_migrations():
                     user_id INTEGER NOT NULL REFERENCES users(id),
                     number INTEGER NOT NULL,
                     phase VARCHAR(50) NOT NULL,
-                    start_date DATE NOT NULL,
+                    start_date DATE,
                     end_date DATE,
                     hospital VARCHAR(255),
                     service VARCHAR(255),
@@ -332,6 +332,18 @@ def run_postgres_migrations():
                     print(f"Migration: Adding '{col}' to {tbl}.")
                     conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN {col} {defn};"))
                     conn.commit()
+
+            # ----------------------------------------------------------
+            # Fix start_date NOT NULL constraint (semesters start empty)
+            # ----------------------------------------------------------
+            try:
+                conn.execute(text(
+                    "ALTER TABLE semesters ALTER COLUMN start_date DROP NOT NULL;"
+                ))
+                conn.commit()
+                print("Migration: start_date NOT NULL constraint dropped.")
+            except Exception:
+                conn.rollback()  # already nullable, ignore
 
             print("All Postgres migrations complete.")
 
