@@ -6,7 +6,7 @@
     x-data="{ showModal: false, today: new Date().toISOString().split('T')[0] }">
 
     <!-- Incomplete Profile Banner -->
-    {% if user.role.value == 'resident' and (not user.semester or not user.start_date or not user.end_date) %}
+    {% if user.role.value == 'resident' and not current_semester %}
     <div
         class="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
         <div class="flex items-center gap-3">
@@ -17,14 +17,14 @@
                 </svg>
             </div>
             <div>
-                <h3 class="text-sm font-semibold text-yellow-900">Profil incomplet</h3>
-                <p class="text-xs text-yellow-700 mt-0.5">Complétez votre profil pour débloquer la comparaison avec vos
-                    co-internes.</p>
+                <h3 class="text-sm font-semibold text-yellow-900">Aucun semestre configuré</h3>
+                <p class="text-xs text-yellow-700 mt-0.5">Configurez votre semestre actuel pour commencer à suivre votre
+                    progression.</p>
             </div>
         </div>
-        <a href="/profil"
+        <a href="/semestres"
             class="w-full sm:w-auto text-center px-4 py-2 bg-white text-yellow-700 text-xs font-semibold rounded-lg border border-yellow-200 hover:bg-yellow-50 transition-colors whitespace-nowrap shadow-sm">
-            Compléter mon profil
+            Gérer mes semestres
         </a>
     </div>
     {% endif %}

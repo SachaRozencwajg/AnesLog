@@ -7,7 +7,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import User
+from app.models import User, Semester
 from app.auth import get_current_user
 
 router = APIRouter()
@@ -18,15 +18,34 @@ def profile(
     request: Request,
     setup: bool = False,
     user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """Render the user profile page."""
+    current_semester = db.query(Semester).filter(
+        Semester.user_id == user.id,
+        Semester.is_current == True,
+    ).first()
+
+    # Compute days for progress bar
+    days_remaining = None
+    days_total = None
+    days_elapsed = None
+    if current_semester and current_semester.start_date and current_semester.end_date:
+        today = datetime.now(timezone.utc).date()
+        days_total = (current_semester.end_date - current_semester.start_date).days
+        days_elapsed = max(0, (today - current_semester.start_date).days)
+        days_remaining = max(0, (current_semester.end_date - today).days)
+
     return templates.TemplateResponse(
         "profile.html",
         {
             "request": request,
             "user": user,
-            "semesters": range(1, 11),  # Semesters 1 to 10
             "setup_mode": setup,
+            "current_semester": current_semester,
+            "days_remaining": days_remaining,
+            "days_total": days_total,
+            "days_elapsed": days_elapsed,
         },
     )
 
@@ -34,75 +53,42 @@ def profile(
 def update_profile(
     request: Request,
     full_name: str = Form(...),
-    semester: int = Form(None),
-    start_date: str = Form(None),
-    end_date: str = Form(None),
-    institution: str = Form(None),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Update the user profile."""
-    
+    """Update the user profile (identity only)."""
+
     # Update full name
     if full_name and full_name.strip():
         user.full_name = full_name.strip()
-    
-    # Resident validation
-    if user.role.value == "resident":
-        if not semester or not start_date or not end_date:
-            return templates.TemplateResponse(
-                "profile.html",
-                {
-                    "request": request,
-                    "user": user,
-                    "semesters": range(1, 11),
-                    "error": "Veuillez remplir tous les champs obligatoires (semestre, dates).",
-                },
-            )
 
-        # Validate dates
-        try:
-            start = datetime.strptime(start_date, "%Y-%m-%d")
-            end = datetime.strptime(end_date, "%Y-%m-%d")
-        except ValueError:
-             return templates.TemplateResponse(
-                "profile.html",
-                {
-                    "request": request,
-                    "user": user,
-                    "semesters": range(1, 11),
-                    "error": "Dates invalides.",
-                },
-            )
-            
-        if start > end:
-            return templates.TemplateResponse(
-                "profile.html",
-                {
-                    "request": request,
-                    "user": user,
-                    "semesters": range(1, 11),
-                    "error": "La date de début doit être antérieure à la date de fin.",
-                },
-            )
-            
-        user.semester = semester
-        user.start_date = start
-        user.end_date = end
-    
-    # Common fields
-    if institution:
-        user.institution = institution
-    
     db.commit()
     db.refresh(user)
-    
+
+    # Re-fetch semester data for response
+    current_semester = db.query(Semester).filter(
+        Semester.user_id == user.id,
+        Semester.is_current == True,
+    ).first()
+
+    days_remaining = None
+    days_total = None
+    days_elapsed = None
+    if current_semester and current_semester.start_date and current_semester.end_date:
+        today = datetime.now(timezone.utc).date()
+        days_total = (current_semester.end_date - current_semester.start_date).days
+        days_elapsed = max(0, (today - current_semester.start_date).days)
+        days_remaining = max(0, (current_semester.end_date - today).days)
+
     return templates.TemplateResponse(
         "profile.html",
         {
             "request": request,
             "user": user,
-            "semesters": range(1, 11),
             "success": "Profil mis à jour avec succès.",
+            "current_semester": current_semester,
+            "days_remaining": days_remaining,
+            "days_total": days_total,
+            "days_elapsed": days_elapsed,
         },
     )
