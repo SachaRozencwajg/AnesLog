@@ -183,6 +183,21 @@ def run_postgres_migrations():
             conn.commit()
             print("Migration: procedure_competences table ready.")
 
+            # Add senior_validated columns to procedure_competences (may already exist)
+            for col_name, col_def in [
+                ("senior_validated", "BOOLEAN NOT NULL DEFAULT FALSE"),
+                ("senior_validated_date", "TIMESTAMP WITH TIME ZONE"),
+                ("senior_validated_by", "INTEGER REFERENCES users(id)"),
+            ]:
+                result = conn.execute(text(
+                    "SELECT column_name FROM information_schema.columns "
+                    f"WHERE table_name='procedure_competences' AND column_name='{col_name}';"
+                ))
+                if not result.fetchone():
+                    print(f"Migration: Adding '{col_name}' to procedure_competences.")
+                    conn.execute(text(f"ALTER TABLE procedure_competences ADD COLUMN {col_name} {col_def};"))
+                    conn.commit()
+
             # Create team_procedure_thresholds table
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS team_procedure_thresholds (
