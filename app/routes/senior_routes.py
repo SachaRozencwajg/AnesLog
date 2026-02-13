@@ -9,7 +9,10 @@ from sqlalchemy import func, or_
 from collections import defaultdict
 
 from app.database import get_db
-from app.models import User, Category, Procedure, ProcedureLog, AutonomyLevel, UserRole, Invitation, InvitationStatus
+from app.models import (
+    User, Category, Procedure, ProcedureLog, AutonomyLevel, UserRole,
+    Invitation, InvitationStatus, CompetencyDomain, Competency,
+)
 from app.auth import require_senior, create_invitation_token
 from app.utils.email import send_email
 from datetime import datetime, timezone
@@ -120,6 +123,10 @@ def team_overview(
         group_totals["vascular"] += c_vascular
         group_totals["autonomy_sum"] += autonomy_pct
 
+        # Acquisition stats for this resident
+        from app.utils.autonomy import compute_acquisition_stats
+        acq = compute_acquisition_stats(db, resident.id, team_id=user.team_id)
+
         resident_stats.append({
             "user": resident,
             "total_logs": total_logs,
@@ -128,6 +135,7 @@ def team_overview(
             "vascular_count": c_vascular,
             "autonomy_pct": autonomy_pct,
             "last_log_date": last_log.date if last_log else None,
+            "acq": acq,
         })
 
     # Calculate Averages (avoid division by zero)
@@ -254,6 +262,13 @@ def manage_procedures(
         for t in thresholds
     }
 
+    # Load competency domains for tagging dropdown
+    comp_domains = db.query(CompetencyDomain).order_by(CompetencyDomain.display_order).all()
+    all_competencies = db.query(Competency).order_by(Competency.domain_id, Competency.display_order).all()
+    competencies_by_domain = defaultdict(list)
+    for comp in all_competencies:
+        competencies_by_domain[comp.domain_id].append(comp)
+
     return templates.TemplateResponse(
         "procedures_config.html",
         {
@@ -263,6 +278,8 @@ def manage_procedures(
             "grouped_sections": grouped_categories,
             "items_by_cat": items_by_cat,
             "thresholds_by_proc": thresholds_by_proc,
+            "comp_domains": comp_domains,
+            "competencies_by_domain": dict(competencies_by_domain),
         }
     )
 
@@ -301,6 +318,7 @@ def add_procedure(
     request: Request,
     category_id: int = Form(...),
     name: str = Form(...),
+    competency_id: int | None = Form(None),
     user: User = Depends(require_senior),
     db: Session = Depends(get_db),
 ):
@@ -317,7 +335,8 @@ def add_procedure(
     new_proc = Procedure(
         name=name.strip(), 
         category_id=category_id, 
-        team_id=user.team_id
+        team_id=user.team_id,
+        competency_id=competency_id if competency_id else None,
     )
     db.add(new_proc)
     db.commit()
@@ -460,6 +479,35 @@ def validate_log_success(
     return RedirectResponse(f"/equipe/{resident.id}", status_code=303)
 
 
+@router.post("/equipe/valider-competence/{resident_id}/{procedure_id}")
+def validate_competence(
+    resident_id: int,
+    procedure_id: int,
+    user: User = Depends(require_senior),
+    db: Session = Depends(get_db),
+):
+    """Senior validates a resident's mastery of a procedure → locks it permanently."""
+    from app.models import ProcedureCompetence
+    
+    resident = db.query(User).get(resident_id)
+    if not resident or resident.team_id != user.team_id:
+        return RedirectResponse("/equipe", status_code=303)
+    
+    comp = db.query(ProcedureCompetence).filter(
+        ProcedureCompetence.user_id == resident_id,
+        ProcedureCompetence.procedure_id == procedure_id,
+        ProcedureCompetence.is_mastered == True,
+    ).first()
+    
+    if comp:
+        comp.senior_validated = True
+        comp.senior_validated_date = datetime.now(timezone.utc)
+        comp.senior_validated_by = user.id
+        db.commit()
+    
+    return RedirectResponse("/equipe/autonomie", status_code=303)
+
+
 @router.post("/equipe/pre-acquis/{resident_id}/{procedure_id}")
 def toggle_pre_mastery(
     resident_id: int,
@@ -484,15 +532,24 @@ def toggle_pre_mastery(
         if comp.is_pre_acquired:
             comp.is_pre_acquired = False
             comp.is_mastered = False
+            comp.senior_validated = False
+            comp.senior_validated_date = None
+            comp.senior_validated_by = None
         else:
             comp.is_pre_acquired = True
             comp.is_mastered = True
+            comp.senior_validated = True
+            comp.senior_validated_date = datetime.now(timezone.utc)
+            comp.senior_validated_by = user.id
     else:
         comp = ProcedureCompetence(
             user_id=resident_id,
             procedure_id=procedure_id,
             is_mastered=True,
             is_pre_acquired=True,
+            senior_validated=True,
+            senior_validated_date=datetime.now(timezone.utc),
+            senior_validated_by=user.id,
             mastered_date=datetime.now(timezone.utc),
         )
         db.add(comp)
@@ -600,6 +657,11 @@ def resident_detail(
     for level, count in autonomy_stats:
         autonomy_dict[level.value] = count
 
+    # Acquisition stats + per-procedure mastery for validation buttons
+    from app.utils.autonomy import compute_acquisition_stats, compute_procedure_mastery_levels
+    acq_stats = compute_acquisition_stats(db, resident_id, team_id=user.team_id)
+    mastery_levels = compute_procedure_mastery_levels(db, resident_id, team_id=user.team_id)
+
     return templates.TemplateResponse(
         "resident_detail.html",
         {
@@ -612,6 +674,8 @@ def resident_detail(
             "category_labels": [cs[0] for cs in category_stats],
             "category_counts": [cs[1] for cs in category_stats],
             "lc_cusum_data": _compute_resident_lc_cusum(db, resident_id),
+            "acq_stats": acq_stats,
+            "mastery_levels": mastery_levels,
         },
     )
 

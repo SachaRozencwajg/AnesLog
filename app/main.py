@@ -53,6 +53,9 @@ def run_migrations():
             ("categories", "team_id", "INTEGER"),
             ("procedures", "team_id", "INTEGER"),
             ("categories", "section", "VARCHAR(50) DEFAULT 'intervention'"),  # New column
+            ("procedure_competences", "senior_validated", "BOOLEAN DEFAULT 0"),
+            ("procedure_competences", "senior_validated_date", "DATETIME"),
+            ("procedure_competences", "senior_validated_by", "INTEGER"),
         ]
         
         for table, col_name, col_type in migrations:

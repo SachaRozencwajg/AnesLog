@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}Mes Semestres — AnesLog{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+        <div>
+            <h1 class="text-2xl font-bold text-primary-900">Parcours DESAR</h1>
+            <p class="text-sm text-gray-500 mt-1">Historique de vos semestres et affectations</p>
+        </div>
+        <a href="/progression"
+            class="inline-flex items-center gap-2 px-4 py-2 bg-primary-50 text-primary-700 rounded-lg text-sm font-medium hover:bg-primary-100 transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            Voir ma progression
+        </a>
+    </div>
+
+    <!-- Timeline -->
+    {% if semesters %}
+    <div class="relative">
+        <!-- Vertical line -->
+        <div class="absolute left-6 top-0 bottom-0 w-0.5 bg-surface-200"></div>
+
+        <div class="space-y-6">
+            {% for sem in semesters %}
+            <div class="relative flex gap-4">
+                <!-- Timeline dot -->
+                <div class="relative z-10 w-12 h-12 rounded-xl flex items-center justify-center text-sm font-bold shrink-0
+                    {% if sem.is_current %}bg-primary-600 text-white shadow-lg shadow-primary-200
+                    {% elif sem.phase.value == 'socle' %}bg-blue-100 text-blue-700
+                    {% elif sem.phase.value == 'approfondissement' %}bg-amber-100 text-amber-700
+                    {% else %}bg-emerald-100 text-emerald-700{% endif %}">
+                    S{{ sem.number }}
+                </div>
+
+                <!-- Card -->
+                <div
+                    class="flex-1 bg-white rounded-xl border border-surface-200 p-4 {% if sem.is_current %}ring-2 ring-primary-200{% endif %}">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-sm font-semibold text-gray-800 capitalize">Phase {{ sem.phase.value }}</span>
+                        {% if sem.is_current %}
+                        <span class="px-2 py-0.5 bg-primary-100 text-primary-700 rounded-full text-xs font-medium">En
+                            cours</span>
+                        {% endif %}
+                    </div>
+                    <div class="text-sm text-gray-600">
+                        {% if sem.hospital %}
+                        <span class="font-medium">{{ sem.hospital }}</span>
+                        {% if sem.service %} — {{ sem.service }}{% endif %}
+                        {% else %}
+                        <span class="text-gray-400 italic">Établissement non renseigné</span>
+                        {% endif %}
+                    </div>
+                    <div class="text-xs text-gray-400 mt-1">
+                        {{ sem.start_date.strftime('%d/%m/%Y') }}
+                        {% if sem.end_date %}→ {{ sem.end_date.strftime('%d/%m/%Y') }}{% else %}→ en cours{% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Add new semester -->
+    <div class="mt-8 bg-white rounded-2xl shadow-sm border border-surface-200 p-6" x-data="{ open: false }">
+        <button @click="open = !open"
+            class="flex items-center gap-2 text-sm font-semibold text-primary-700 hover:text-primary-800 transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            Démarrer un nouveau semestre
+        </button>
+
+        <form action="/semestres/nouveau" method="post" x-show="open" x-transition class="mt-4 space-y-3">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">Numéro du semestre</label>
+                    <select name="number" required
+                        class="w-full rounded-lg border border-surface-200 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-300 focus:border-primary-400 outline-none">
+                        {% for i in range(1, 11) %}
+                        <option value="{{ i }}" {% if user.semester and i==user.semester + 1 %}selected{% endif %}>
+                            S{{ i }} — {% if i <= 2 %}Socle{% elif i <=8 %}Approfondissement{% else %}Consolidation{%
+                                endif %} </option>
+                                {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">Date de début</label>
+                    <input type="date" name="start_date" required
+                        class="w-full rounded-lg border border-surface-200 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-300 focus:border-primary-400 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">Hôpital</label>
+                    <input type="text" name="hospital" placeholder="Ex: Hôpital Marie Lannelongue"
+                        class="w-full rounded-lg border border-surface-200 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-300 focus:border-primary-400 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">Service</label>
+                    <input type="text" name="service" placeholder="Ex: Anesthésie-Réanimation"
+                        class="w-full rounded-lg border border-surface-200 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-300 focus:border-primary-400 outline-none">
+                </div>
+            </div>
+            <div class="flex justify-end">
+                <button type="submit"
+                    class="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors">
+                    Créer le semestre
+                </button>
+            </div>
+        </form>
+    </div>
+
+</div>
+{% endblock %}

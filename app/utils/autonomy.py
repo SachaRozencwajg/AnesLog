@@ -14,11 +14,184 @@ from app.models import (
     ProcedureLog, ProcedureCompetence, TeamProcedureThreshold,
     Procedure, Category, AutonomyLevel, User
 )
+from sqlalchemy import or_
 
 
 # ---------------------------------------------------------------------------
-# LC-CUSUM Calculation
+# Per-Procedure Acquisition Level
 # ---------------------------------------------------------------------------
+
+def compute_procedure_mastery_levels(
+    db: Session,
+    user_id: int,
+    team_id: int | None = None,
+    category_id: int | None = None,
+) -> dict[int, dict]:
+    """
+    For every procedure accessible to the user, compute the current
+    acquisition level based on their log history and competence records.
+
+    Returns: {
+        procedure_id: {
+            "level": "locked" | "mastered" | "autonomous" | "capable" | "learning" | "not_started",
+            "log_count": int,
+            "autonomous_count": int,
+            "is_locked": bool,        # senior-validated
+            "procedure": Procedure,
+        }
+    }
+
+    Level ladder:
+        locked       → is_mastered + senior_validated (or pre_acquired)
+        mastered     → is_mastered, awaiting senior validation
+        autonomous   → ≥1 autonomous log but below mastery threshold
+        capable      → latest logs are "Je sais faire" (no autonomous yet)
+        learning     → has logs but mostly observed/assisted
+        not_started  → zero logs
+    """
+    # 1. All procedures the user can see
+    proc_q = db.query(Procedure).join(Category)
+    if category_id:
+        proc_q = proc_q.filter(Category.id == category_id)
+    if team_id:
+        proc_q = proc_q.filter(or_(Procedure.team_id == None, Procedure.team_id == team_id))
+    else:
+        proc_q = proc_q.filter(Procedure.team_id == None)
+    # Only interventions (section = 'intervention')
+    proc_q = proc_q.filter(Category.section == "intervention")
+    procedures = proc_q.order_by(Category.name, Procedure.name).all()
+
+    # 2. Competence records
+    comps = db.query(ProcedureCompetence).filter(
+        ProcedureCompetence.user_id == user_id
+    ).all()
+    comp_map = {c.procedure_id: c for c in comps}
+
+    # 3. Log counts by (procedure, autonomy_level)
+    from collections import defaultdict
+    log_data: dict[int, dict] = defaultdict(lambda: {"total": 0, "autonomous": 0, "capable": 0})
+    rows = (
+        db.query(
+            ProcedureLog.procedure_id,
+            ProcedureLog.autonomy_level,
+            func.count(ProcedureLog.id),
+        )
+        .filter(ProcedureLog.user_id == user_id)
+        .group_by(ProcedureLog.procedure_id, ProcedureLog.autonomy_level)
+        .all()
+    )
+    for proc_id, level, cnt in rows:
+        log_data[proc_id]["total"] += cnt
+        if level == AutonomyLevel.autonomous:
+            log_data[proc_id]["autonomous"] += cnt
+        elif level == AutonomyLevel.capable:
+            log_data[proc_id]["capable"] += cnt
+
+    # 4. Build result
+    result = {}
+    for proc in procedures:
+        comp = comp_map.get(proc.id)
+        data = log_data.get(proc.id, {"total": 0, "autonomous": 0, "capable": 0})
+
+        if comp and (comp.senior_validated or comp.is_pre_acquired):
+            level = "locked"
+        elif comp and comp.is_mastered:
+            level = "mastered"
+        elif data["autonomous"] > 0:
+            level = "autonomous"
+        elif data["capable"] > 0:
+            level = "capable"
+        elif data["total"] > 0:
+            level = "learning"
+        else:
+            level = "not_started"
+
+        result[proc.id] = {
+            "level": level,
+            "log_count": data["total"],
+            "autonomous_count": data["autonomous"],
+            "is_locked": level == "locked",
+            "procedure": proc,
+        }
+
+    return result
+
+
+def compute_acquisition_stats(
+    db: Session,
+    user_id: int,
+    team_id: int | None = None,
+    category_id: int | None = None,
+) -> dict:
+    """
+    Summary stats for dashboard display.
+
+    Returns: {
+        "locked": int,       # Fully validated (green ✓ 🔒)
+        "mastered": int,     # Awaiting senior validation
+        "autonomous": int,   # Some autonomous logs, below threshold
+        "capable": int,      # Can do it but not autonomous yet
+        "learning": int,     # Still learning
+        "not_started": int,
+        "total": int,        # Total procedures
+    }
+    """
+    levels = compute_procedure_mastery_levels(db, user_id, team_id, category_id)
+
+    stats = {"locked": 0, "mastered": 0, "autonomous": 0, "capable": 0, "learning": 0, "not_started": 0}
+    for info in levels.values():
+        stats[info["level"]] += 1
+    stats["total"] = len(levels)
+    return stats
+
+
+def check_and_update_mastery(db: Session, user_id: int, procedure_id: int):
+    """
+    After logging, check if the resident just crossed the mastery threshold
+    for a procedure. If so, create/update ProcedureCompetence.
+
+    Called from add_log after committing new logs.
+    """
+    threshold = ProcedureCompetence.MASTERY_THRESHOLD
+
+    # Already mastered? Skip.
+    comp = db.query(ProcedureCompetence).filter(
+        ProcedureCompetence.user_id == user_id,
+        ProcedureCompetence.procedure_id == procedure_id,
+    ).first()
+
+    if comp and comp.is_mastered:
+        return  # Already mastered, nothing to do
+
+    # Count autonomous logs for this procedure
+    autonomous_count = db.query(func.count(ProcedureLog.id)).filter(
+        ProcedureLog.user_id == user_id,
+        ProcedureLog.procedure_id == procedure_id,
+        ProcedureLog.autonomy_level == AutonomyLevel.autonomous,
+    ).scalar() or 0
+
+    if autonomous_count >= threshold:
+        total_logs = db.query(func.count(ProcedureLog.id)).filter(
+            ProcedureLog.user_id == user_id,
+            ProcedureLog.procedure_id == procedure_id,
+        ).scalar() or 0
+
+        from datetime import datetime, timezone
+        if comp:
+            comp.is_mastered = True
+            comp.mastered_at_log_count = total_logs
+            comp.mastered_date = datetime.now(timezone.utc)
+        else:
+            comp = ProcedureCompetence(
+                user_id=user_id,
+                procedure_id=procedure_id,
+                is_mastered=True,
+                mastered_at_log_count=total_logs,
+                mastered_date=datetime.now(timezone.utc),
+            )
+            db.add(comp)
+        db.commit()
+
 
 def compute_lc_cusum(logs: list[ProcedureLog], p0: float = 0.3, p1: float = 0.1) -> dict:
     """
@@ -220,7 +393,7 @@ def build_autonomy_matrix(
     for c in competences:
         comp_map[(c.user_id, c.procedure_id)] = c
     
-    # Get log counts per (user, procedure)
+    # Get log counts per (user, procedure) and autonomous counts
     log_counts_raw = db.query(
         ProcedureLog.user_id,
         ProcedureLog.procedure_id,
@@ -233,6 +406,21 @@ def build_autonomy_matrix(
     log_counts = {}
     for user_id, proc_id, cnt in log_counts_raw:
         log_counts[(user_id, proc_id)] = cnt
+
+    # Autonomous log counts
+    auto_counts_raw = db.query(
+        ProcedureLog.user_id,
+        ProcedureLog.procedure_id,
+        func.count(ProcedureLog.id).label("cnt")
+    ).filter(
+        ProcedureLog.user_id.in_(resident_ids),
+        ProcedureLog.autonomy_level == AutonomyLevel.autonomous,
+    ).group_by(
+        ProcedureLog.user_id, ProcedureLog.procedure_id
+    ).all()
+    auto_counts = {}
+    for user_id, proc_id, cnt in auto_counts_raw:
+        auto_counts[(user_id, proc_id)] = cnt
     
     # Build matrix
     matrix = {}
@@ -241,12 +429,14 @@ def build_autonomy_matrix(
         for proc in procedures:
             key = (resident.id, proc.id)
             count = log_counts.get(key, 0)
+            autonomous_count = auto_counts.get(key, 0)
             comp = comp_map.get(key)
             
-            if comp and comp.is_pre_acquired:
-                status = "pre_acquired"
+            if comp and (comp.senior_validated or comp.is_pre_acquired):
+                status = "locked"
                 alert_type = None
             elif comp and comp.is_mastered:
+                # Mastered but not yet validated by senior
                 # Check for over-confidence alert
                 thresh = thresholds.get(proc.id)
                 if thresh and comp.mastered_at_log_count and comp.mastered_at_log_count < thresh["min"]:
@@ -271,7 +461,10 @@ def build_autonomy_matrix(
             matrix[resident.id][proc.id] = {
                 "status": status,
                 "log_count": count,
+                "autonomous_count": autonomous_count,
                 "alert_type": alert_type,
+                "is_pre_acquired": comp.is_pre_acquired if comp else False,
+                "senior_validated": comp.senior_validated if comp else False,
             }
     
     return {

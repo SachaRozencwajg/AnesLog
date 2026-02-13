@@ -13,7 +13,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, extract, or_
 
 from app.database import get_db
-from app.models import User, Category, Procedure, ProcedureLog, AutonomyLevel, UserRole
+from app.models import (
+    User, Category, Procedure, ProcedureLog, AutonomyLevel, UserRole,
+    CompetencyDomain, Competency, Semester, GuardLog, GuardType, DesarPhase,
+)
 from app.auth import get_current_user
 
 router = APIRouter()
@@ -61,19 +64,9 @@ def dashboard(
         cat_query = cat_query.filter(Procedure.category_id == category)
     category_stats = cat_query.group_by(Category.name).all()
 
-    # Autonomy distribution
-    autonomy_stats = (
-        db.query(
-            ProcedureLog.autonomy_level,
-            func.count(ProcedureLog.id).label("count"),
-        )
-        .filter(*base_filter)
-        .group_by(ProcedureLog.autonomy_level)
-        .all()
-    )
-    autonomy_dict = {level.value: 0 for level in AutonomyLevel}
-    for level, count in autonomy_stats:
-        autonomy_dict[level.value] = count
+    # Acquisition stats (per-procedure mastery levels instead of raw counts)
+    from app.utils.autonomy import compute_acquisition_stats, compute_procedure_mastery_levels
+    acquisition_stats = compute_acquisition_stats(db, user.id, user.team_id, category)
 
     # Recent logs (last 5)
     recent_query = (
@@ -196,12 +189,19 @@ def dashboard(
             "borderRadius": 4,
         })
 
-    # Mastered procedures (skip autonomy question for these)
+    # Mastered/locked procedures (skip autonomy question for these)
     from app.models import ProcedureCompetence
     mastered_ids = set(
         r[0] for r in db.query(ProcedureCompetence.procedure_id).filter(
             ProcedureCompetence.user_id == user.id,
             ProcedureCompetence.is_mastered == True,
+        ).all()
+    )
+    locked_ids = set(
+        r[0] for r in db.query(ProcedureCompetence.procedure_id).filter(
+            ProcedureCompetence.user_id == user.id,
+            ProcedureCompetence.is_mastered == True,
+            ProcedureCompetence.senior_validated == True,
         ).all()
     )
 
@@ -212,7 +212,7 @@ def dashboard(
             "user": user,
             "total_logs": total_logs,
             "category_stats": category_stats,
-            "autonomy_dict": autonomy_dict,
+            "acquisition_stats": acquisition_stats,
             "recent_logs": recent_logs,
             "categories": categories,
             "grouped_sections": grouped_sections,
@@ -221,6 +221,7 @@ def dashboard(
             "selected_category": category,
             "temporal_chart": temporal_chart,
             "mastered_procedure_ids": mastered_ids,
+            "locked_procedure_ids": locked_ids,
         },
     )
 
@@ -322,6 +323,17 @@ def add_log(
         if plog: db.add(plog)
 
     db.commit()
+
+    # Check if any procedure just crossed the mastery threshold
+    from app.utils.autonomy import check_and_update_mastery
+    logged_proc_ids = {intervention_id}
+    for pid in procedure_ids:
+        logged_proc_ids.add(pid)
+    for pid in complication_ids:
+        logged_proc_ids.add(pid)
+    for pid in logged_proc_ids:
+        check_and_update_mastery(db, user.id, pid)
+
     return RedirectResponse("/tableau-de-bord", status_code=303)
 
 
@@ -432,3 +444,302 @@ def delete_log(
     db.commit()
 
     return RedirectResponse("/mon-carnet", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# DESAR Progression
+# ---------------------------------------------------------------------------
+
+@router.get("/progression")
+def progression(
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Competency progression overview by DESAR domain (A-G + CoBaTrICE).
+    Calculates progress for each domain based on logged procedures.
+    """
+    if user.role == UserRole.senior:
+        return RedirectResponse("/equipe", status_code=303)
+
+    # Get all competency domains
+    domains = db.query(CompetencyDomain).order_by(CompetencyDomain.display_order).all()
+
+    # Get current semester
+    current_semester = db.query(Semester).filter(
+        Semester.user_id == user.id,
+        Semester.is_current == True,
+    ).first()
+
+    # For each domain, calculate progress
+    domain_progress = []
+    for domain in domains:
+        # Get all competencies in this domain
+        competencies = db.query(Competency).filter(
+            Competency.domain_id == domain.id,
+        ).order_by(Competency.display_order).all()
+
+        if not competencies:
+            domain_progress.append({
+                "domain": domain,
+                "competencies": [],
+                "total": 0,
+                "mastered": 0,
+                "in_progress": 0,
+                "percent": 0,
+            })
+            continue
+
+        # Find procedures tagged to competencies in this domain
+        comp_ids = [c.id for c in competencies]
+        domain_procs = db.query(Procedure).filter(
+            Procedure.competency_id.in_(comp_ids)
+        ).all()
+
+        # Count logs per competency for this user
+        comp_details = []
+        mastered = 0
+        in_progress = 0
+
+        for comp in competencies:
+            # Get procedures linked to this competency
+            comp_procs = [p for p in domain_procs if p.competency_id == comp.id]
+            proc_ids = [p.id for p in comp_procs]
+
+            if not proc_ids:
+                comp_details.append({
+                    "competency": comp,
+                    "log_count": 0,
+                    "autonomous_count": 0,
+                    "status": "not_started",
+                    "procedures": comp_procs,
+                })
+                continue
+
+            # Count total logs and autonomous logs
+            log_count = db.query(func.count(ProcedureLog.id)).filter(
+                ProcedureLog.user_id == user.id,
+                ProcedureLog.procedure_id.in_(proc_ids),
+            ).scalar() or 0
+
+            autonomous_count = db.query(func.count(ProcedureLog.id)).filter(
+                ProcedureLog.user_id == user.id,
+                ProcedureLog.procedure_id.in_(proc_ids),
+                ProcedureLog.autonomy_level == AutonomyLevel.autonomous,
+            ).scalar() or 0
+
+            # Determine status
+            if autonomous_count >= 3:
+                status = "mastered"
+                mastered += 1
+            elif log_count > 0:
+                status = "in_progress"
+                in_progress += 1
+            else:
+                status = "not_started"
+
+            comp_details.append({
+                "competency": comp,
+                "log_count": log_count,
+                "autonomous_count": autonomous_count,
+                "status": status,
+                "procedures": comp_procs,
+            })
+
+        total = len(competencies)
+        percent = round((mastered / total) * 100) if total > 0 else 0
+
+        domain_progress.append({
+            "domain": domain,
+            "competencies": comp_details,
+            "total": total,
+            "mastered": mastered,
+            "in_progress": in_progress,
+            "percent": percent,
+        })
+
+    # Guard count
+    guard_count = db.query(func.count(GuardLog.id)).filter(
+        GuardLog.user_id == user.id,
+    ).scalar() or 0
+
+    # Total cases
+    total_cases = db.query(func.count(func.distinct(ProcedureLog.case_id))).filter(
+        ProcedureLog.user_id == user.id,
+        ProcedureLog.case_id != None,
+    ).scalar() or 0
+
+    # Determine current phase
+    current_phase = None
+    if user.semester:
+        current_phase = Semester.phase_for_semester(user.semester)
+
+    return templates.TemplateResponse("progression.html", {
+        "request": request,
+        "user": user,
+        "domain_progress": domain_progress,
+        "current_semester": current_semester,
+        "current_phase": current_phase,
+        "guard_count": guard_count,
+        "total_cases": total_cases,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Guard Tracking
+# ---------------------------------------------------------------------------
+
+@router.get("/gardes")
+def gardes_page(
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Guard log management page."""
+    if user.role == UserRole.senior:
+        return RedirectResponse("/equipe", status_code=303)
+
+    guards = db.query(GuardLog).filter(
+        GuardLog.user_id == user.id,
+    ).order_by(GuardLog.date.desc()).all()
+
+    current_semester = db.query(Semester).filter(
+        Semester.user_id == user.id,
+        Semester.is_current == True,
+    ).first()
+
+    # Count per semester
+    semester_count = 0
+    if current_semester:
+        semester_count = db.query(func.count(GuardLog.id)).filter(
+            GuardLog.user_id == user.id,
+            GuardLog.semester_id == current_semester.id,
+        ).scalar() or 0
+
+    return templates.TemplateResponse("gardes.html", {
+        "request": request,
+        "user": user,
+        "guards": guards,
+        "current_semester": current_semester,
+        "semester_count": semester_count,
+        "guard_types": list(GuardType),
+    })
+
+
+@router.post("/gardes/ajouter")
+def add_guard(
+    date_str: str = Form(..., alias="date"),
+    guard_type: str = Form(...),
+    notes: str = Form(""),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Add a new guard log."""
+    current_semester = db.query(Semester).filter(
+        Semester.user_id == user.id,
+        Semester.is_current == True,
+    ).first()
+
+    guard_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    gt = GuardType(guard_type)
+
+    db.add(GuardLog(
+        user_id=user.id,
+        date=guard_date,
+        guard_type=gt,
+        semester_id=current_semester.id if current_semester else None,
+        notes=notes if notes else None,
+    ))
+    db.commit()
+
+    return RedirectResponse("/gardes", status_code=303)
+
+
+@router.post("/gardes/{guard_id}/supprimer")
+def delete_guard(
+    guard_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Delete a guard log."""
+    guard = db.query(GuardLog).filter(
+        GuardLog.id == guard_id,
+        GuardLog.user_id == user.id,
+    ).first()
+    if not guard:
+        raise HTTPException(status_code=404, detail="Garde non trouvée.")
+
+    db.delete(guard)
+    db.commit()
+
+    return RedirectResponse("/gardes", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Semester Management
+# ---------------------------------------------------------------------------
+
+@router.get("/semestres")
+def semestres_page(
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Semester history and management."""
+    if user.role == UserRole.senior:
+        return RedirectResponse("/equipe", status_code=303)
+
+    semesters = db.query(Semester).filter(
+        Semester.user_id == user.id,
+    ).order_by(Semester.number).all()
+
+    return templates.TemplateResponse("semestres.html", {
+        "request": request,
+        "user": user,
+        "semesters": semesters,
+        "phases": list(DesarPhase),
+    })
+
+
+@router.post("/semestres/nouveau")
+def new_semester(
+    number: int = Form(...),
+    hospital: str = Form(""),
+    service: str = Form(""),
+    start_date_str: str = Form(..., alias="start_date"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Create a new semester."""
+    start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+    phase = Semester.phase_for_semester(number)
+
+    # Close current semester
+    current = db.query(Semester).filter(
+        Semester.user_id == user.id,
+        Semester.is_current == True,
+    ).first()
+    if current:
+        current.is_current = False
+        current.end_date = start_date
+
+    # Create new semester
+    sem = Semester(
+        user_id=user.id,
+        number=number,
+        phase=phase,
+        start_date=start_date,
+        hospital=hospital if hospital else None,
+        service=service if service else None,
+        team_id=user.team_id,
+        is_current=True,
+    )
+    db.add(sem)
+
+    # Update user's current semester number
+    user.semester = number
+
+    db.commit()
+
+    return RedirectResponse("/semestres", status_code=303)

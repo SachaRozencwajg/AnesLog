@@ -1,0 +1,278 @@
+{% extends "base.html" %}
+
+{% block title %}Progression DESAR — AnesLog{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+
+    <!-- Header with phase progress -->
+    <div class="mb-8">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+            <div>
+                <h1 class="text-2xl font-bold text-primary-900">Progression DESAR</h1>
+                <p class="text-sm text-gray-500 mt-1">Suivi des compétences nationales (Journal Officiel, 28 avril 2017)
+                </p>
+            </div>
+            <a href="/semestres"
+                class="inline-flex items-center gap-2 px-4 py-2 bg-primary-50 text-primary-700 rounded-lg text-sm font-medium hover:bg-primary-100 transition-all">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                Gérer mes semestres
+            </a>
+        </div>
+
+        <!-- Phase banner -->
+        {% if current_phase %}
+        <div class="bg-white rounded-2xl shadow-sm border border-surface-200 p-6 mb-6">
+            <div class="flex items-center gap-4 mb-4">
+                <div class="flex-1">
+                    <div class="flex items-center gap-3 mb-3">
+                        {% if current_semester %}
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold
+                            {% if current_phase.value == 'socle' %}bg-blue-100 text-blue-800
+                            {% elif current_phase.value == 'approfondissement' %}bg-amber-100 text-amber-800
+                            {% else %}bg-emerald-100 text-emerald-800{% endif %}">
+                            S{{ user.semester }}
+                        </span>
+                        <span class="text-lg font-semibold text-gray-800 capitalize">Phase {{ current_phase.value
+                            }}</span>
+                        {% if current_semester %}
+                        <span class="text-sm text-gray-400">·</span>
+                        <span class="text-sm text-gray-500">{{ current_semester.hospital or 'Non renseigné' }}</span>
+                        {% endif %}
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Phase progress bar -->
+            <div class="flex items-center gap-2">
+                {% set phase_labels = [('socle', 'Socle', 'S1-S2'), ('approfondissement', 'Approfondissement', 'S3-S8'),
+                ('consolidation', 'Consolidation', 'S9-S10')] %}
+                {% for phase_val, phase_label, phase_range in phase_labels %}
+                <div class="flex-1">
+                    <div class="relative h-3 rounded-full overflow-hidden
+                        {% if current_phase.value == phase_val %}bg-gradient-to-r from-primary-400 to-medical-accent shadow-sm
+                        {% elif (phase_val == 'socle') or (phase_val == 'approfondissement' and current_phase.value == 'consolidation') %}bg-primary-200
+                        {% else %}bg-surface-200{% endif %}">
+                    </div>
+                    <div class="flex justify-between mt-1">
+                        <span
+                            class="text-xs {% if current_phase.value == phase_val %}text-primary-700 font-semibold{% else %}text-gray-400{% endif %}">{{
+                            phase_label }}</span>
+                        <span class="text-xs text-gray-400">{{ phase_range }}</span>
+                    </div>
+                </div>
+                {% if not loop.last %}
+                <div class="w-4 flex justify-center">
+                    <svg class="w-3 h-3 text-gray-300" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z" />
+                    </svg>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Quick stats -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+            <div class="bg-white rounded-xl border border-surface-200 p-4 text-center">
+                <div class="text-2xl font-bold text-primary-600">{{ total_cases }}</div>
+                <div class="text-xs text-gray-500 mt-1">Cas logués</div>
+            </div>
+            <div class="bg-white rounded-xl border border-surface-200 p-4 text-center">
+                <div class="text-2xl font-bold text-amber-600">{{ guard_count }}</div>
+                <div class="text-xs text-gray-500 mt-1">Gardes</div>
+            </div>
+            <div class="bg-white rounded-xl border border-surface-200 p-4 text-center">
+                {% set mastered_total = domain_progress | sum(attribute='mastered') %}
+                {% set comp_total = domain_progress | sum(attribute='total') %}
+                <div class="text-2xl font-bold text-emerald-600">{{ mastered_total }}</div>
+                <div class="text-xs text-gray-500 mt-1">Compétences validées</div>
+            </div>
+            <div class="bg-white rounded-xl border border-surface-200 p-4 text-center">
+                {% set ip_total = domain_progress | sum(attribute='in_progress') %}
+                <div class="text-2xl font-bold text-blue-600">{{ ip_total }}</div>
+                <div class="text-xs text-gray-500 mt-1">En progression</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Explainer: Comprendre les domaines DESAR -->
+    <div class="bg-blue-50/60 rounded-2xl border border-blue-100 overflow-hidden mb-6" x-data="{ infoOpen: false }">
+        <button @click="infoOpen = !infoOpen"
+            class="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-blue-50 transition-colors">
+            <svg class="w-5 h-5 text-blue-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span class="text-sm font-semibold text-blue-800">Comprendre les domaines de compétences DESAR</span>
+            <svg class="w-4 h-4 text-blue-400 ml-auto transition-transform shrink-0" :class="infoOpen && 'rotate-180'"
+                fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+        </button>
+
+        <div x-show="infoOpen" x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" class="px-5 pb-5">
+            <p class="text-xs text-blue-700/70 mb-4 leading-relaxed">
+                Le programme du DESAR est structuré en <strong>7 domaines (A à G)</strong> définis par le <em>Journal
+                    Officiel du 28 avril 2017</em>, auxquels s'ajoute le référentiel <strong>CoBaTrICE</strong> pour la
+                réanimation. Chaque domaine regroupe des compétences que l'interne doit progressivement maîtriser au
+                cours de ses 10 semestres.
+            </p>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {% for dp in domain_progress %}
+                <div class="flex items-start gap-2.5 bg-white/60 rounded-xl px-3.5 py-2.5 border border-blue-100/50">
+                    <span class="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 mt-0.5
+                        {% if dp.domain.code == 'COBA' %}bg-purple-100 text-purple-700
+                        {% else %}bg-blue-100 text-blue-700{% endif %}">
+                        {{ dp.domain.code }}
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-xs font-semibold text-gray-800">{{ dp.domain.name }}</p>
+                        <p class="text-xs text-gray-500 leading-snug mt-0.5">{{ dp.domain.description or '—' }}</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <p class="text-xs text-blue-600/60 mt-3 italic">
+                💡 Une compétence est considérée <strong>validée</strong> lorsque l'interne a logué ≥ 3 actes en
+                <strong>autonomie complète</strong> dans cette compétence.
+            </p>
+        </div>
+    </div>
+
+    <!-- Domain cards -->
+    <div class="space-y-4">
+        {% for dp in domain_progress %}
+        <div class="bg-white rounded-2xl shadow-sm border border-surface-200 overflow-hidden" x-data="{ open: false }">
+            <!-- Domain header -->
+            <button @click="open = !open"
+                class="w-full flex items-center gap-4 p-5 text-left hover:bg-surface-50 transition-colors">
+                <!-- Domain badge -->
+                <div class="w-12 h-12 rounded-xl flex items-center justify-center text-lg font-bold shrink-0
+                    {% if dp.percent == 100 %}bg-emerald-100 text-emerald-700
+                    {% elif dp.percent > 0 %}bg-primary-100 text-primary-700
+                    {% else %}bg-surface-100 text-gray-400{% endif %}">
+                    {{ dp.domain.code }}
+                </div>
+
+                <!-- Domain info -->
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2">
+                        <h3 class="text-sm font-semibold text-gray-800 truncate">{{ dp.domain.name }}</h3>
+                        {% if dp.domain.phase_required %}
+                        <span class="text-xs px-2 py-0.5 rounded-full shrink-0
+                            {% if dp.domain.phase_required.value == 'socle' %}bg-blue-50 text-blue-600
+                            {% elif dp.domain.phase_required.value == 'approfondissement' %}bg-amber-50 text-amber-600
+                            {% else %}bg-emerald-50 text-emerald-600{% endif %}">
+                            {{ dp.domain.phase_required.value | capitalize }}
+                        </span>
+                        {% endif %}
+                    </div>
+                    <p class="text-xs text-gray-400 mt-0.5 truncate">{{ dp.domain.description or '' }}</p>
+
+                    <!-- Progress bar -->
+                    <div class="flex items-center gap-3 mt-2">
+                        <div class="flex-1 h-2 bg-surface-100 rounded-full overflow-hidden">
+                            <div class="h-full rounded-full transition-all duration-500
+                                {% if dp.percent == 100 %}bg-emerald-500
+                                {% elif dp.percent > 0 %}bg-gradient-to-r from-primary-400 to-medical-accent
+                                {% endif %}" style="width: {{ dp.percent }}%">
+                            </div>
+                        </div>
+                        <span class="text-xs font-medium tabular-nums
+                            {% if dp.percent == 100 %}text-emerald-600
+                            {% elif dp.percent > 0 %}text-primary-600
+                            {% else %}text-gray-400{% endif %}">
+                            {{ dp.mastered }}/{{ dp.total }}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Chevron -->
+                <svg class="w-5 h-5 text-gray-400 transition-transform shrink-0" :class="open && 'rotate-180'"
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+            </button>
+
+            <!-- Competency details (expandable) -->
+            <div x-show="open" x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0 -translate-y-2" x-transition:enter-end="opacity-100 translate-y-0"
+                class="border-t border-surface-100">
+                {% if dp.competencies %}
+                <div class="divide-y divide-surface-50">
+                    {% for cd in dp.competencies %}
+                    <div class="flex items-center gap-3 px-5 py-3 hover:bg-surface-50 transition-colors">
+                        <!-- Status dot -->
+                        <div class="w-3 h-3 rounded-full shrink-0
+                            {% if cd.status == 'mastered' %}bg-emerald-500
+                            {% elif cd.status == 'in_progress' %}bg-amber-400
+                            {% else %}bg-surface-200{% endif %}">
+                        </div>
+
+                        <!-- Competency info -->
+                        <div class="flex-1 min-w-0">
+                            <p
+                                class="text-sm {% if cd.status == 'mastered' %}text-emerald-700 font-medium{% elif cd.status == 'in_progress' %}text-gray-800{% else %}text-gray-400{% endif %} truncate">
+                                {{ cd.competency.name }}
+                            </p>
+                            {% if cd.competency.description %}
+                            <p class="text-xs text-gray-400 truncate">{{ cd.competency.description }}</p>
+                            {% endif %}
+                        </div>
+
+                        <!-- Stats -->
+                        <div class="flex items-center gap-3 shrink-0">
+                            {% if cd.log_count > 0 %}
+                            <span class="text-xs text-gray-500">{{ cd.log_count }} actes</span>
+                            <span class="text-xs px-2 py-0.5 rounded-full
+                                {% if cd.status == 'mastered' %}bg-emerald-100 text-emerald-700
+                                {% else %}bg-amber-100 text-amber-700{% endif %}">
+                                {{ cd.autonomous_count }} autonomes
+                            </span>
+                            {% else %}
+                            <span class="text-xs text-gray-300">Pas encore logué</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="px-5 py-4 text-sm text-gray-400 text-center">
+                    Aucune compétence définie dans ce domaine.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Legend -->
+    <div class="mt-8 bg-white rounded-xl border border-surface-200 p-4">
+        <div class="flex flex-wrap items-center gap-6 text-xs text-gray-500">
+            <span class="font-medium text-gray-700">Légende :</span>
+            <span class="flex items-center gap-1.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                Validé (≥ 3 actes autonomes)
+            </span>
+            <span class="flex items-center gap-1.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+                En cours
+            </span>
+            <span class="flex items-center gap-1.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-surface-200"></span>
+                Non commencé
+            </span>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
