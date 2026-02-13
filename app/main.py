@@ -122,6 +122,39 @@ def health_check(db: Session = Depends(get_db)):
         return {"status": "error", "detail": str(e)}
 
 
+@app.get("/debug-login")
+def debug_login(email: str = "srozencwajg@ghpsj.fr", db: Session = Depends(get_db)):
+    """Debug endpoint: replicate login query to diagnose 500."""
+    import traceback
+    try:
+        user = db.query(User).filter(User.email == email).first()
+        if not user:
+            return {"status": "user_not_found", "email": email}
+        return {
+            "status": "ok",
+            "user_id": user.id,
+            "email": user.email,
+            "role": user.role.value if user.role else None,
+            "is_active": user.is_active,
+            "is_approved": user.is_approved,
+            "team_id": user.team_id,
+        }
+    except Exception as e:
+        return {"status": "error", "detail": str(e), "traceback": traceback.format_exc()}
+
+
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: Request, exc: Exception):
+    import traceback
+    tb = traceback.format_exc()
+    print(f"UNHANDLED ERROR on {request.url}: {exc}\n{tb}")
+    from fastapi.responses import JSONResponse
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc), "path": str(request.url), "traceback": tb}
+    )
+
+
 @app.get("/")
 def root(user: User | None = Depends(get_optional_user)):
     """Redirect root to dashboard or login."""
