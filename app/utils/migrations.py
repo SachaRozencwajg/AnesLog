@@ -230,5 +230,60 @@ def run_postgres_migrations():
             conn.commit()
             print("Migration: team_procedure_thresholds table ready.")
 
+            # Create semesters table (DESAR tracking) — must be BEFORE FK columns
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS semesters (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES users(id),
+                    number INTEGER NOT NULL,
+                    phase VARCHAR(50) NOT NULL,
+                    start_date DATE NOT NULL,
+                    end_date DATE,
+                    hospital VARCHAR(255),
+                    service VARCHAR(255),
+                    team_id INTEGER REFERENCES teams(id),
+                    is_current BOOLEAN NOT NULL DEFAULT FALSE,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                );
+            """))
+            conn.commit()
+            print("Migration: semesters table ready.")
+
+            # Create guard_logs table
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS guard_logs (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES users(id),
+                    date DATE NOT NULL,
+                    guard_type VARCHAR(50) NOT NULL DEFAULT 'Garde 24h',
+                    semester_id INTEGER REFERENCES semesters(id),
+                    notes TEXT,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                );
+            """))
+            conn.commit()
+            print("Migration: guard_logs table ready.")
+
+            # ----------------------------------------------------------
+            # Comprehensive column check: add ANY column missing from models
+            # ----------------------------------------------------------
+            _missing_columns = [
+                # (table, column, definition)
+                ("procedure_logs", "surgery_type", "VARCHAR(100)"),
+                ("procedure_logs", "semester_id", "INTEGER REFERENCES semesters(id)"),
+                ("procedures", "competency_id", "INTEGER REFERENCES competencies(id)"),
+            ]
+            for tbl, col, defn in _missing_columns:
+                r = conn.execute(text(
+                    "SELECT column_name FROM information_schema.columns "
+                    f"WHERE table_name='{tbl}' AND column_name='{col}';"
+                ))
+                if not r.fetchone():
+                    print(f"Migration: Adding '{col}' to {tbl}.")
+                    conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN {col} {defn};"))
+                    conn.commit()
+
+            print("All Postgres migrations complete.")
+
     except Exception as e:
         print(f"Postgres migration failed: {e}")
