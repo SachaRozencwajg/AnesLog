@@ -705,7 +705,7 @@ def _compute_resident_lc_cusum(db: Session, resident_id: int) -> list[dict]:
     
     results = []
     for proc_id, proc_logs in by_procedure.items():
-        if len(proc_logs) < 2:  # Need at least 2 logs for meaningful curve
+        if len(proc_logs) < 1:  # Show all gestures that have any logs
             continue
         cusum = compute_lc_cusum(proc_logs)
         proc = proc_logs[0].procedure
@@ -716,8 +716,8 @@ def _compute_resident_lc_cusum(db: Session, resident_id: int) -> list[dict]:
             "lc_cusum": cusum,
         })
     
-    # Sort by procedure name
-    results.sort(key=lambda x: x["procedure_name"])
+    # Sort by category name, then procedure name
+    results.sort(key=lambda x: (x["category_name"], x["procedure_name"]))
     return results
 
 
