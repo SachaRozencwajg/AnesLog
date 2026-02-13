@@ -450,7 +450,7 @@
                         afterBody: function (ttItems) {
                             const idx = ttItems[0].dataIndex;
                             const dp = data.data_points[idx];
-                            return `Date: ${dp.date}\nAutonomie: ${dp.autonomy}\n${dp.success ? '✓ Succès' : '✗ Échec'}${dp.is_senior_validated ? ' (validé sénior)' : ''}`;
+                            return `Date: ${dp.date}\nAutonomie: ${dp.autonomy}\n${dp.success ? '✓ Réussi' : '✗ Échoué'}`;
                         }
                     }
                 }

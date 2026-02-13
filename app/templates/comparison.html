@@ -259,7 +259,7 @@
                         afterBody: function (ctx) {
                             const idx = ctx[0].dataIndex;
                             const dp = data.data_points[idx];
-                            return `Autonomie: ${dp.autonomy}\n${dp.success ? '✓ Succès' : '✗ Échec'}${dp.is_senior_validated ? ' (validé sénior)' : ''}`;
+                            return `Autonomie: ${dp.autonomy}\n${dp.success ? '✓ Réussi' : '✗ Échoué'}`;
                         }
                     }
                 }
