@@ -168,6 +168,12 @@ SURGERY_TYPES = [
 # ---------------------------------------------------------------------------
 # Seed data – edit this dict to add/remove categories and procedures
 # ---------------------------------------------------------------------------
+# Map category names to their correct section
+CATEGORY_SECTIONS: dict[str, str] = {
+    "Gestes techniques": "gesture",
+    "Complications post-opératoire": "complication",
+}
+
 SEED_DATA: dict[str, list[str]] = {
     "Chirurgie Thoracique": [
         "Résection pulmonaire",
@@ -352,17 +358,18 @@ def seed_semesters(db, team):
     print("\n📅 Seeding demo semesters...")
     
     # Diverse hospital rotation — realistic Île-de-France training
+    # (hospital, service, chef_de_service)
     HOSPITAL_ROTATIONS = [
-        ("Hôpital Marie Lannelongue", "Anesthésie-Réanimation Cardiovasculaire"),
-        ("Hôpital Bicêtre", "Réanimation Chirurgicale"),
-        ("Hôpital Necker", "Anesthésie Pédiatrique"),
-        ("Hôpital Cochin", "Anesthésie Obstétricale"),
-        ("CHU Kremlin-Bicêtre", "Réanimation Médicale"),
-        ("Hôpital Tenon", "Chirurgie Digestive"),
-        ("Hôpital Lariboisière", "Neuro-Anesthésie"),
-        ("Hôpital Saint-Louis", "Réanimation Polyvalente"),
-        ("Hôpital Foch", "Chirurgie Thoracique"),
-        ("Hôpital Européen Georges Pompidou", "Chirurgie Vasculaire"),
+        ("Hôpital Marie Lannelongue", "Anesthésie-Réanimation Cardiovasculaire", "Pr. Olaf Mercier"),
+        ("Hôpital Bicêtre", "Réanimation Chirurgicale", "Pr. Jacques Martin"),
+        ("Hôpital Necker", "Anesthésie Pédiatrique", "Pr. Isabelle Constant"),
+        ("Hôpital Cochin", "Anesthésie Obstétricale", "Pr. Anne Bhogal"),
+        ("CHU Kremlin-Bicêtre", "Réanimation Médicale", "Pr. David Osman"),
+        ("Hôpital Tenon", "Chirurgie Digestive", "Pr. Frédéric Aubrun"),
+        ("Hôpital Lariboisière", "Neuro-Anesthésie", "Pr. Sébastien Pili-Floury"),
+        ("Hôpital Saint-Louis", "Réanimation Polyvalente", "Pr. Benoît Plaud"),
+        ("Hôpital Foch", "Chirurgie Thoracique", "Pr. Marc Fischler"),
+        ("Hôpital Européen Georges Pompidou", "Chirurgie Vasculaire", "Pr. Bernard Cholley"),
     ]
     
     residents_data = {ud["email"]: ud for ud in DEMO_USERS if ud["role"] == UserRole.resident}
@@ -380,30 +387,37 @@ def seed_semesters(db, team):
         user_info = residents_data.get(user.email, {})
         current_sem = user_info.get("semester", 2)
         
-        # Compute realistic start date based on semester number
-        # Each semester = ~6 months. If S10 now, started ~5 years ago
+        # Compute a realistic start date for S1 based on how many semesters completed
+        from dateutil.relativedelta import relativedelta
         months_back = (current_sem - 1) * 6
-        desar_start = date.today() - timedelta(days=months_back * 30)
+        s1_start = date.today() - timedelta(days=months_back * 30)
         
         user.semester = current_sem
-        user.desar_start_date = desar_start
         
-        # Build semester history with rotating hospitals
         shuffled_hospitals = list(HOSPITAL_ROTATIONS)
         random.shuffle(shuffled_hospitals)
         
-        for s in range(1, current_sem + 1):
+        for s in range(1, 11):  # Always create all 10 blocks
             phase = Semester.phase_for_semester(s)
-            hosp, serv = shuffled_hospitals[(s - 1) % len(shuffled_hospitals)]
             
-            # Compute actual dates
-            sem_start = desar_start + timedelta(days=(s - 1) * 182)
-            sem_end = sem_start + timedelta(days=181) if s < current_sem else None
-            
-            # Current semester = at Marie Lannelongue (team hospital)
-            if s == current_sem:
-                hosp = "Hôpital Marie Lannelongue"
-                serv = "Anesthésie-Réanimation Cardiovasculaire"
+            if s <= current_sem:
+                # Past & current semesters: fill in dates + hospital
+                sem_start = s1_start + relativedelta(months=6 * (s - 1))
+                sem_end = sem_start + relativedelta(months=6) - timedelta(days=1)
+                hosp, serv, chef = shuffled_hospitals[(s - 1) % len(shuffled_hospitals)]
+                subdiv = "Île-de-France"  # All demo users are in IDF
+                if s == current_sem:
+                    hosp = "Hôpital Marie Lannelongue"
+                    serv = "Anesthésie-Réanimation Cardiovasculaire"
+                    chef = "Pr. Olaf Mercier"
+            else:
+                # Future semesters: empty blocks
+                sem_start = None
+                sem_end = None
+                subdiv = None
+                hosp = None
+                serv = None
+                chef = None
             
             sem = Semester(
                 user_id=user.id,
@@ -411,8 +425,10 @@ def seed_semesters(db, team):
                 phase=phase,
                 start_date=sem_start,
                 end_date=sem_end,
+                subdivision=subdiv,
                 hospital=hosp,
                 service=serv,
+                chef_de_service=chef,
                 team_id=team.id,
                 is_current=(s == current_sem),
             )
@@ -746,11 +762,15 @@ def seed():
         print("\n📦 Seeding categories and procedures...")
         for category_name, procedure_names in SEED_DATA.items():
             cat = db.query(Category).filter(Category.name == category_name).first()
+            section = CATEGORY_SECTIONS.get(category_name, "intervention")
             if not cat:
-                cat = Category(name=category_name)
+                cat = Category(name=category_name, section=section)
                 db.add(cat)
                 db.flush()
-                print(f"  ✓ Catégorie: {category_name}")
+                print(f"  ✓ Catégorie: {category_name} (section={section})")
+            elif cat.section != section:
+                cat.section = section
+                print(f"  ↻ Section corrigée: {category_name} → {section}")
 
             for proc_name in procedure_names:
                 exists = (

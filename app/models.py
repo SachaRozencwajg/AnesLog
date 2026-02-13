@@ -317,7 +317,8 @@ class TeamProcedureThreshold(Base):
 class Semester(Base):
     """
     Tracks a resident's semester (S1-S10) in the DESAR program.
-    A new Semester row is created each time the resident starts a new semester.
+    All 10 blocks are pre-created; the resident fills in dates and details.
+    End date = start_date + 6 months (auto-calculated).
     """
     __tablename__ = "semesters"
 
@@ -325,10 +326,12 @@ class Semester(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     number = Column(Integer, nullable=False)  # 1-10
     phase = Column(SAEnum(DesarPhase), nullable=False)
-    start_date = Column(Date, nullable=False)
-    end_date = Column(Date, nullable=True)  # Null = current semester
+    start_date = Column(Date, nullable=True)  # Null = not yet configured
+    end_date = Column(Date, nullable=True)  # Auto = start_date + 6 months
+    subdivision = Column(String(100), nullable=True)  # Région / subdivision (ex: Île-de-France)
     hospital = Column(String(255), nullable=True)  # Établissement
-    service = Column(String(255), nullable=True)  # Service
+    service = Column(String(255), nullable=True)  # Service / département
+    chef_de_service = Column(String(255), nullable=True)  # Chef(fe) de service
     team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)  # Team during this semester
     is_current = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))

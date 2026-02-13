@@ -34,44 +34,132 @@ def dashboard(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Resident dashboard with summary stats and progress bars."""
+    """Resident semester dashboard — 'Where am I right now?'"""
     # Redirect seniors to their own view
     if user.role == UserRole.senior:
         return RedirectResponse("/equipe", status_code=303)
 
-    # Base filter for this user
-    base_filter = [ProcedureLog.user_id == user.id]
+    # -------------------------------------------------------------------
+    # Current semester context
+    # -------------------------------------------------------------------
+    current_semester = db.query(Semester).filter(
+        Semester.user_id == user.id,
+        Semester.is_current == True,
+    ).first()
+
+    # Determine semester date range for scoping all data
+    today = datetime.now(timezone.utc).date()
+    query_end = datetime.now(timezone.utc)
+    query_start = query_end - timedelta(days=180)
+    semester_label = None
+    days_remaining = None
+    days_total = None
+    days_elapsed = None
+
+    if current_semester and current_semester.start_date:
+        query_start = datetime.combine(current_semester.start_date, datetime.min.time()).replace(tzinfo=timezone.utc)
+        if current_semester.end_date:
+            query_end = datetime.combine(current_semester.end_date, datetime.max.time()).replace(tzinfo=timezone.utc)
+            days_total = (current_semester.end_date - current_semester.start_date).days
+            days_elapsed = max(0, (today - current_semester.start_date).days)
+            days_remaining = max(0, (current_semester.end_date - today).days)
+        semester_label = f"S{current_semester.number}"
+
+    # Semester date filter for procedure logs
+    sem_date_filter = [
+        ProcedureLog.user_id == user.id,
+        ProcedureLog.date >= query_start,
+        ProcedureLog.date <= query_end,
+    ]
 
     # Apply optional category filter
     if category:
         query_proc_ids = db.query(Procedure.id).filter(Procedure.category_id == category)
-        base_filter.append(ProcedureLog.procedure_id.in_(query_proc_ids))
+        sem_date_filter.append(ProcedureLog.procedure_id.in_(query_proc_ids))
 
-    # Total cases count (unique case_id)
-    total_logs = db.query(func.count(func.distinct(ProcedureLog.case_id))).filter(*base_filter, ProcedureLog.case_id != None).scalar() or 0
+    # -------------------------------------------------------------------
+    # Semester-scoped stats
+    # -------------------------------------------------------------------
+    # Total actes THIS semester
+    total_actes = db.query(func.count(ProcedureLog.id)).filter(
+        ProcedureLog.user_id == user.id,
+        ProcedureLog.date >= query_start,
+        ProcedureLog.date <= query_end,
+    ).scalar() or 0
 
-    # Logs per category for progress display
-    cat_query = (
+    # Guards THIS semester
+    guard_filter = [GuardLog.user_id == user.id]
+    if current_semester and current_semester.start_date:
+        guard_filter.append(GuardLog.date >= current_semester.start_date)
+        if current_semester.end_date:
+            guard_filter.append(GuardLog.date <= current_semester.end_date)
+    semester_guards = db.query(func.count(GuardLog.id)).filter(*guard_filter).scalar() or 0
+
+    # Logs per category + per procedure THIS semester (for detailed breakdown)
+    # Use LEFT OUTER JOIN so procedures with 0 logs still appear
+    from sqlalchemy import outerjoin, and_
+
+    # Sub-query: logs for this user in this semester
+    semester_log_filter = and_(
+        ProcedureLog.procedure_id == Procedure.id,
+        ProcedureLog.user_id == user.id,
+        ProcedureLog.date >= query_start,
+        ProcedureLog.date <= query_end,
+    )
+
+    proc_detail_query = (
         db.query(
-            Category.name,
+            Category.name.label("cat_name"),
+            Category.section,
+            Procedure.name.label("proc_name"),
             func.count(ProcedureLog.id).label("count"),
         )
         .join(Procedure, Procedure.category_id == Category.id)
-        .join(ProcedureLog, ProcedureLog.procedure_id == Procedure.id)
-        .filter(ProcedureLog.user_id == user.id)
+        .outerjoin(ProcedureLog, semester_log_filter)
+        .filter(
+            or_(
+                Category.team_id == None,
+                Category.team_id == user.team_id,
+            ),
+            or_(
+                Procedure.team_id == None,
+                Procedure.team_id == user.team_id,
+            ),
+        )
+        .group_by(Category.name, Category.section, Procedure.name)
+        .order_by(Category.name, func.count(ProcedureLog.id).desc())
     )
-    if category:
-        cat_query = cat_query.filter(Procedure.category_id == category)
-    category_stats = cat_query.group_by(Category.name).all()
+    proc_detail_raw = proc_detail_query.all()
 
-    # Acquisition stats (per-procedure mastery levels instead of raw counts)
+    # Build nested structure: section → [{ name, count, procedures: [(name, count)] }]
+    _cat_map = {}  # cat_name → { "section": ..., "count": 0, "procedures": [] }
+    for cat_name, section, proc_name, count in proc_detail_raw:
+        sec = section or "intervention"
+        if cat_name not in _cat_map:
+            _cat_map[cat_name] = {"section": sec, "count": 0, "procedures": []}
+        _cat_map[cat_name]["count"] += count
+        _cat_map[cat_name]["procedures"].append((proc_name, count))
+
+    category_stats_by_section = {
+        "intervention": [],
+        "gesture": [],
+        "complication": [],
+    }
+    for cat_name, data in sorted(_cat_map.items(), key=lambda x: -x[1]["count"]):
+        category_stats_by_section[data["section"]].append({
+            "name": cat_name,
+            "count": data["count"],
+            "procedures": data["procedures"],
+        })
+
+    # Acquisition stats (global — mastery is career-wide)
     from app.utils.autonomy import compute_acquisition_stats, compute_procedure_mastery_levels
     acquisition_stats = compute_acquisition_stats(db, user.id, user.team_id, category)
 
-    # Recent logs (last 5)
+    # Recent logs THIS semester (last 5)
     recent_query = (
         db.query(ProcedureLog)
-        .filter(*base_filter)
+        .filter(*sem_date_filter)
         .order_by(ProcedureLog.date.desc())
         .limit(5)
     )
@@ -113,28 +201,8 @@ def dashboard(
             grouped_sections["interventions"].append(cat)
 
     # -------------------------------------------------------------------
-    # Temporal progression data (last 6 months, grouped by month)
+    # Temporal progression data (scoped to current semester)
     # -------------------------------------------------------------------
-    # -------------------------------------------------------------------
-    # Temporal progression data (Semester period or last 6 months)
-    # -------------------------------------------------------------------
-    
-    # Determine date range
-    query_end = datetime.now(timezone.utc)
-    query_start = query_end - timedelta(days=180)
-    
-    if user.start_date and user.end_date:
-        # Use profile dates if available
-        query_start = user.start_date
-        if query_start.tzinfo is None:
-            query_start = query_start.replace(tzinfo=timezone.utc)
-            
-        query_end = user.end_date
-        if query_end.tzinfo is None:
-            query_end = query_end.replace(tzinfo=timezone.utc)
-        # Include the full end date (end of day approx)
-        query_end = query_end + timedelta(days=1) - timedelta(seconds=1)
-
     temporal_logs = (
         db.query(ProcedureLog)
         .filter(
@@ -147,15 +215,9 @@ def dashboard(
 
     # Build monthly buckets
     month_labels = []
-    
-    # Normalize start to 1st of month for label generation
     curr = query_start.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    
-    # Loop until we surpass the end date's month
     while curr <= query_end:
         month_labels.append(curr.strftime("%b %Y"))
-        
-        # Advance to next month
         if curr.month == 12:
             curr = curr.replace(year=curr.year + 1, month=1)
         else:
@@ -205,16 +267,26 @@ def dashboard(
         ).all()
     )
 
+    # Group categories by section for filter pills
+    categories_by_section = {
+        "intervention": [],
+        "gesture": [],
+        "complication": [],
+    }
+    for cat in categories:
+        sec = cat.section or "intervention"
+        categories_by_section[sec].append(cat)
+
     return templates.TemplateResponse(
         "dashboard.html",
         {
             "request": request,
             "user": user,
-            "total_logs": total_logs,
-            "category_stats": category_stats,
-            "acquisition_stats": acquisition_stats,
+            "total_actes": total_actes,
+            "category_stats_by_section": category_stats_by_section,
             "recent_logs": recent_logs,
             "categories": categories,
+            "categories_by_section": categories_by_section,
             "grouped_sections": grouped_sections,
             "procedures_by_cat_id": procedures_by_cat_id,
             "autonomy_levels": AutonomyLevel,
@@ -222,6 +294,11 @@ def dashboard(
             "temporal_chart": temporal_chart,
             "mastered_procedure_ids": mastered_ids,
             "locked_procedure_ids": locked_ids,
+            "current_semester": current_semester,
+            "semester_label": semester_label,
+            "days_remaining": days_remaining,
+            "days_total": days_total,
+            "days_elapsed": days_elapsed,
         },
     )
 
@@ -680,66 +757,166 @@ def delete_guard(
 # Semester Management
 # ---------------------------------------------------------------------------
 
+# Configurable number of semesters per specialty.
+# DESAR = 10 semesters (5 years). Other specialties may differ.
+TOTAL_SEMESTERS = 10
+
+# All French medical training subdivisions (CHU cities / regions)
+SUBDIVISIONS = [
+    "Île-de-France",
+    "Aix-Marseille",
+    "Amiens",
+    "Angers",
+    "Antilles-Guyane",
+    "Besançon",
+    "Bordeaux",
+    "Brest",
+    "Caen",
+    "Clermont-Ferrand",
+    "Dijon",
+    "Grenoble",
+    "La Réunion",
+    "Lille",
+    "Limoges",
+    "Lyon",
+    "Montpellier",
+    "Nancy",
+    "Nantes",
+    "Nice",
+    "Océan Indien",
+    "Poitiers",
+    "Reims",
+    "Rennes",
+    "Rouen",
+    "Saint-Étienne",
+    "Strasbourg",
+    "Toulouse",
+    "Tours",
+]
+
+
+def _ensure_semester_blocks(db: Session, user: User):
+    """
+    Ensure all TOTAL_SEMESTERS empty blocks exist for this user.
+    Blocks start empty (no dates). The resident fills them in.
+    """
+    existing = db.query(Semester).filter(
+        Semester.user_id == user.id,
+    ).order_by(Semester.number).all()
+    existing_numbers = {s.number for s in existing}
+
+    created = False
+    for i in range(1, TOTAL_SEMESTERS + 1):
+        if i not in existing_numbers:
+            sem = Semester(
+                user_id=user.id,
+                number=i,
+                phase=Semester.phase_for_semester(i),
+                start_date=None,
+                end_date=None,
+                hospital=None,
+                service=None,
+                team_id=user.team_id,
+                is_current=False,
+            )
+            db.add(sem)
+            created = True
+
+    if created:
+        db.commit()
+
+    # Refresh & determine which semester is current
+    all_semesters = db.query(Semester).filter(
+        Semester.user_id == user.id,
+    ).order_by(Semester.number).all()
+
+    today = datetime.now(timezone.utc).date()
+
+    # Reset is_current
+    for s in all_semesters:
+        s.is_current = False
+
+    # Find which semester today falls into
+    current_found = False
+    for s in all_semesters:
+        if s.start_date and s.end_date and s.start_date <= today <= s.end_date:
+            s.is_current = True
+            user.semester = s.number
+            current_found = True
+            break
+
+    if not current_found:
+        # Mark the latest filled semester as current
+        filled = [s for s in all_semesters if s.start_date]
+        if filled:
+            filled[-1].is_current = True
+            user.semester = filled[-1].number
+
+    db.commit()
+    return all_semesters
+
+
 @router.get("/semestres")
 def semestres_page(
     request: Request,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Semester history and management."""
+    """Semester history and management with pre-generated blocks."""
     if user.role == UserRole.senior:
         return RedirectResponse("/equipe", status_code=303)
 
-    semesters = db.query(Semester).filter(
-        Semester.user_id == user.id,
-    ).order_by(Semester.number).all()
+    semesters = _ensure_semester_blocks(db, user)
+
+    # Count filled semesters
+    filled_count = sum(1 for s in semesters if s.start_date)
 
     return templates.TemplateResponse("semestres.html", {
         "request": request,
         "user": user,
         "semesters": semesters,
         "phases": list(DesarPhase),
+        "total_semesters": TOTAL_SEMESTERS,
+        "filled_count": filled_count,
+        "subdivisions": SUBDIVISIONS,
     })
 
 
-@router.post("/semestres/nouveau")
-def new_semester(
-    number: int = Form(...),
+@router.post("/semestres/{semester_id}/modifier")
+def edit_semester(
+    semester_id: int,
+    start_date_str: str = Form("", alias="start_date"),
+    subdivision: str = Form(""),
     hospital: str = Form(""),
     service: str = Form(""),
-    start_date_str: str = Form(..., alias="start_date"),
+    chef_de_service: str = Form(""),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Create a new semester."""
-    start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
-    phase = Semester.phase_for_semester(number)
+    """Edit a semester: dates, subdivision, hospital, service, chef de service."""
+    from dateutil.relativedelta import relativedelta
 
-    # Close current semester
-    current = db.query(Semester).filter(
+    sem = db.query(Semester).filter(
+        Semester.id == semester_id,
         Semester.user_id == user.id,
-        Semester.is_current == True,
     ).first()
-    if current:
-        current.is_current = False
-        current.end_date = start_date
+    if not sem:
+        raise HTTPException(status_code=404, detail="Semestre non trouvé.")
 
-    # Create new semester
-    sem = Semester(
-        user_id=user.id,
-        number=number,
-        phase=phase,
-        start_date=start_date,
-        hospital=hospital if hospital else None,
-        service=service if service else None,
-        team_id=user.team_id,
-        is_current=True,
-    )
-    db.add(sem)
+    # Update start date & auto-calculate end date
+    if start_date_str:
+        start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+        sem.start_date = start_date
+        sem.end_date = start_date + relativedelta(months=6) - timedelta(days=1)
+    else:
+        # Clear dates if start_date removed
+        sem.start_date = None
+        sem.end_date = None
 
-    # Update user's current semester number
-    user.semester = number
-
+    sem.subdivision = subdivision if subdivision else None
+    sem.hospital = hospital if hospital else None
+    sem.service = service if service else None
+    sem.chef_de_service = chef_de_service if chef_de_service else None
     db.commit()
 
     return RedirectResponse("/semestres", status_code=303)

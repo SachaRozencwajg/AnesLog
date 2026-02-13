@@ -3,13 +3,16 @@
 {% block title %}Mes Semestres — AnesLog{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+<div class="max-w-4xl mx-auto px-4 sm:px-6 py-8"
+    x-data="{ editingId: null, editStartDate: '', editSubdivision: '', editHospital: '', editService: '', editChef: '' }">
 
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
             <h1 class="text-2xl font-bold text-primary-900">Parcours DESAR</h1>
-            <p class="text-sm text-gray-500 mt-1">Historique de vos semestres et affectations</p>
+            <p class="text-sm text-gray-500 mt-1">
+                {{ filled_count }} / {{ total_semesters }} semestres renseignés
+            </p>
         </div>
         <a href="/progression"
             class="inline-flex items-center gap-2 px-4 py-2 bg-primary-50 text-primary-700 rounded-lg text-sm font-medium hover:bg-primary-100 transition-all">
@@ -21,34 +24,70 @@
         </a>
     </div>
 
+    <!-- Phase Legend -->
+    <div class="flex flex-wrap gap-3 mb-6">
+        <div class="flex items-center gap-1.5 text-xs text-gray-500">
+            <span class="w-3 h-3 rounded-full bg-blue-400"></span> Socle (S1–S2)
+        </div>
+        <div class="flex items-center gap-1.5 text-xs text-gray-500">
+            <span class="w-3 h-3 rounded-full bg-amber-400"></span> Approfondissement (S3–S8)
+        </div>
+        <div class="flex items-center gap-1.5 text-xs text-gray-500">
+            <span class="w-3 h-3 rounded-full bg-emerald-400"></span> Consolidation (S9–S10)
+        </div>
+    </div>
+
     <!-- Timeline -->
-    {% if semesters %}
     <div class="relative">
         <!-- Vertical line -->
         <div class="absolute left-6 top-0 bottom-0 w-0.5 bg-surface-200"></div>
 
-        <div class="space-y-6">
+        <div class="space-y-4">
             {% for sem in semesters %}
             <div class="relative flex gap-4">
                 <!-- Timeline dot -->
                 <div class="relative z-10 w-12 h-12 rounded-xl flex items-center justify-center text-sm font-bold shrink-0
                     {% if sem.is_current %}bg-primary-600 text-white shadow-lg shadow-primary-200
+                    {% elif not sem.start_date %}bg-gray-100 text-gray-400
                     {% elif sem.phase.value == 'socle' %}bg-blue-100 text-blue-700
                     {% elif sem.phase.value == 'approfondissement' %}bg-amber-100 text-amber-700
                     {% else %}bg-emerald-100 text-emerald-700{% endif %}">
                     S{{ sem.number }}
                 </div>
 
-                <!-- Card -->
-                <div
-                    class="flex-1 bg-white rounded-xl border border-surface-200 p-4 {% if sem.is_current %}ring-2 ring-primary-200{% endif %}">
-                    <div class="flex items-center gap-2 mb-1">
-                        <span class="text-sm font-semibold text-gray-800 capitalize">Phase {{ sem.phase.value }}</span>
-                        {% if sem.is_current %}
-                        <span class="px-2 py-0.5 bg-primary-100 text-primary-700 rounded-full text-xs font-medium">En
-                            cours</span>
-                        {% endif %}
+                <!-- Card (display mode) -->
+                <div x-show="editingId !== {{ sem.id }}"
+                    class="flex-1 rounded-xl border p-4 transition-all group
+                    {% if sem.is_current %}bg-white border-primary-300 ring-2 ring-primary-200
+                    {% elif sem.start_date %}bg-white border-surface-200 hover:border-primary-200
+                    {% else %}bg-gray-50 border-dashed border-gray-200 hover:border-primary-300 hover:bg-white{% endif %}">
+
+                    <div class="flex items-center justify-between mb-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm font-semibold text-gray-800 capitalize">Phase {{ sem.phase.value
+                                }}</span>
+                            {% if sem.is_current %}
+                            <span
+                                class="px-2 py-0.5 bg-primary-100 text-primary-700 rounded-full text-xs font-medium">En
+                                cours</span>
+                            {% endif %}
+                            {% if sem.subdivision %}
+                            <span class="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">{{
+                                sem.subdivision }}</span>
+                            {% endif %}
+                        </div>
+                        <button
+                            @click="editingId = {{ sem.id }}; editStartDate = '{{ sem.start_date.strftime('%Y-%m-%d') if sem.start_date else '' }}'; editSubdivision = '{{ sem.subdivision|default('', true)|e }}'; editHospital = '{{ sem.hospital|default('', true)|e }}'; editService = '{{ sem.service|default('', true)|e }}'; editChef = '{{ sem.chef_de_service|default('', true)|e }}'"
+                            class="{% if sem.start_date %}opacity-0 group-hover:opacity-100{% endif %} p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
+                            title="Modifier">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
+                        </button>
                     </div>
+
+                    {% if sem.start_date %}
                     <div class="text-sm text-gray-600">
                         {% if sem.hospital %}
                         <span class="font-medium">{{ sem.hospital }}</span>
@@ -57,63 +96,94 @@
                         <span class="text-gray-400 italic">Établissement non renseigné</span>
                         {% endif %}
                     </div>
+                    {% if sem.chef_de_service %}
+                    <div class="text-xs text-gray-500 mt-0.5">
+                        <svg class="w-3 h-3 inline -mt-0.5 mr-0.5" fill="none" stroke="currentColor"
+                            viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                        Chef de service : {{ sem.chef_de_service }}
+                    </div>
+                    {% endif %}
                     <div class="text-xs text-gray-400 mt-1">
                         {{ sem.start_date.strftime('%d/%m/%Y') }}
-                        {% if sem.end_date %}→ {{ sem.end_date.strftime('%d/%m/%Y') }}{% else %}→ en cours{% endif %}
+                        → {{ sem.end_date.strftime('%d/%m/%Y') if sem.end_date else '?' }}
+                        <span class="text-gray-300 ml-1">(6 mois)</span>
                     </div>
+                    {% else %}
+                    <p class="text-sm text-gray-400 italic">Semestre non configuré — cliquez sur le crayon pour
+                        renseigner</p>
+                    {% endif %}
+                </div>
+
+                <!-- Card (edit mode) -->
+                <div x-show="editingId === {{ sem.id }}" x-cloak
+                    class="flex-1 bg-white rounded-xl border-2 border-primary-300 p-4 shadow-sm">
+                    <form action="/semestres/{{ sem.id }}/modifier" method="post">
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="text-sm font-semibold text-primary-700 capitalize">S{{ sem.number }} · Phase {{
+                                sem.phase.value }}</span>
+                        </div>
+
+                        <!-- Row 1: Date + Subdivision -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">Date de début</label>
+                                <input type="date" name="start_date" x-model="editStartDate"
+                                    class="w-full rounded-lg border border-surface-200 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-300 focus:border-primary-400 outline-none">
+                                <p class="text-[10px] text-gray-400 mt-0.5">Fin = début + 6 mois (auto)</p>
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">Subdivision</label>
+                                <select name="subdivision" x-model="editSubdivision"
+                                    class="w-full rounded-lg border border-surface-200 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-300 focus:border-primary-400 outline-none bg-white">
+                                    <option value="">— Choisir une subdivision —</option>
+                                    {% for sub in subdivisions %}
+                                    <option value="{{ sub }}">{{ sub }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Row 2: Hospital + Service -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">Hôpital / Établissement</label>
+                                <input type="text" name="hospital" x-model="editHospital"
+                                    placeholder="Ex: Hôpital Bicêtre"
+                                    class="w-full rounded-lg border border-surface-200 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-300 focus:border-primary-400 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">Service / Département</label>
+                                <input type="text" name="service" x-model="editService"
+                                    placeholder="Ex: Réanimation Chirurgicale"
+                                    class="w-full rounded-lg border border-surface-200 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-300 focus:border-primary-400 outline-none">
+                            </div>
+                        </div>
+
+                        <!-- Row 3: Chef de service -->
+                        <div class="mb-3">
+                            <label class="block text-xs text-gray-500 mb-1">Chef(fe) de service</label>
+                            <input type="text" name="chef_de_service" x-model="editChef" placeholder="Ex: Pr. Dupont"
+                                class="w-full rounded-lg border border-surface-200 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-300 focus:border-primary-400 outline-none">
+                        </div>
+
+                        <div class="flex justify-end gap-2">
+                            <button type="button" @click="editingId = null"
+                                class="px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100 transition-colors">
+                                Annuler
+                            </button>
+                            <button type="submit"
+                                class="px-4 py-1.5 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors">
+                                Enregistrer
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
             {% endfor %}
         </div>
-    </div>
-    {% endif %}
-
-    <!-- Add new semester -->
-    <div class="mt-8 bg-white rounded-2xl shadow-sm border border-surface-200 p-6" x-data="{ open: false }">
-        <button @click="open = !open"
-            class="flex items-center gap-2 text-sm font-semibold text-primary-700 hover:text-primary-800 transition-colors">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
-            Démarrer un nouveau semestre
-        </button>
-
-        <form action="/semestres/nouveau" method="post" x-show="open" x-transition class="mt-4 space-y-3">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                    <label class="block text-xs text-gray-500 mb-1">Numéro du semestre</label>
-                    <select name="number" required
-                        class="w-full rounded-lg border border-surface-200 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-300 focus:border-primary-400 outline-none">
-                        {% for i in range(1, 11) %}
-                        <option value="{{ i }}" {% if user.semester and i==user.semester + 1 %}selected{% endif %}>
-                            S{{ i }} — {% if i <= 2 %}Socle{% elif i <=8 %}Approfondissement{% else %}Consolidation{%
-                                endif %} </option>
-                                {% endfor %}
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs text-gray-500 mb-1">Date de début</label>
-                    <input type="date" name="start_date" required
-                        class="w-full rounded-lg border border-surface-200 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-300 focus:border-primary-400 outline-none">
-                </div>
-                <div>
-                    <label class="block text-xs text-gray-500 mb-1">Hôpital</label>
-                    <input type="text" name="hospital" placeholder="Ex: Hôpital Marie Lannelongue"
-                        class="w-full rounded-lg border border-surface-200 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-300 focus:border-primary-400 outline-none">
-                </div>
-                <div>
-                    <label class="block text-xs text-gray-500 mb-1">Service</label>
-                    <input type="text" name="service" placeholder="Ex: Anesthésie-Réanimation"
-                        class="w-full rounded-lg border border-surface-200 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-300 focus:border-primary-400 outline-none">
-                </div>
-            </div>
-            <div class="flex justify-end">
-                <button type="submit"
-                    class="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors">
-                    Créer le semestre
-                </button>
-            </div>
-        </form>
     </div>
 
 </div>
