@@ -252,6 +252,7 @@
                                 {% endif %}
                             </td>
                             <td class="px-3 py-3 text-center">
+                                {% if log.procedure.category.section == 'gesture' %}
                                 {% if log.is_success is not none %}
                                 {% if log.is_success %}
                                 <span
@@ -263,6 +264,9 @@
                                     class="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs font-medium rounded-full">
                                     ❌ Échoué
                                 </span>
+                                {% endif %}
+                                {% else %}
+                                <span class="text-xs text-gray-400">—</span>
                                 {% endif %}
                                 {% else %}
                                 <span class="text-xs text-gray-400">—</span>

@@ -345,6 +345,29 @@ def run_postgres_migrations():
             except Exception:
                 conn.rollback()  # already nullable, ignore
 
+            # ----------------------------------------------------------
+            # Clear is_success on non-gesture procedure logs
+            # (LC-CUSUM success/failure only applies to gestures)
+            # ----------------------------------------------------------
+            try:
+                result = conn.execute(text("""
+                    UPDATE procedure_logs
+                    SET is_success = NULL
+                    WHERE is_success IS NOT NULL
+                      AND procedure_id NOT IN (
+                        SELECT p.id FROM procedures p
+                        JOIN categories c ON p.category_id = c.id
+                        WHERE c.section = 'gesture'
+                      );
+                """))
+                conn.commit()
+                rows = result.rowcount
+                if rows:
+                    print(f"Migration: Cleared is_success on {rows} non-gesture logs.")
+            except Exception as e:
+                conn.rollback()
+                print(f"Migration warning: clear is_success failed: {e}")
+
             print("All Postgres migrations complete.")
 
     except Exception as e:
