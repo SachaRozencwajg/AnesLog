@@ -990,6 +990,7 @@ def _ensure_semester_blocks(db: Session, user: User):
 @router.get("/semestres")
 def semestres_page(
     request: Request,
+    error: str = None,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -1010,6 +1011,7 @@ def semestres_page(
         "total_semesters": TOTAL_SEMESTERS,
         "filled_count": filled_count,
         "subdivisions": SUBDIVISIONS,
+        "error": error,
     })
 
 
@@ -1037,8 +1039,36 @@ def edit_semester(
     # Update start date & auto-calculate end date
     if start_date_str:
         start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+        end_date = start_date + relativedelta(months=6) - timedelta(days=1)
+
+        # ── Reject overlapping semesters ──
+        # Check ALL other semesters for this user that have dates
+        other_semesters = db.query(Semester).filter(
+            Semester.user_id == user.id,
+            Semester.id != sem.id,
+            Semester.start_date.isnot(None),
+            Semester.end_date.isnot(None),
+        ).all()
+
+        for other in other_semesters:
+            # Two ranges [A_start, A_end] and [B_start, B_end] overlap
+            # if A_start <= B_end AND B_start <= A_end
+            if start_date <= other.end_date and other.start_date <= end_date:
+                # Return to semestres page with error
+                from urllib.parse import quote
+                error_msg = (
+                    f"Impossible : les dates du S{sem.number} "
+                    f"({start_date.strftime('%d/%m/%Y')} → {end_date.strftime('%d/%m/%Y')}) "
+                    f"chevauchent le S{other.number} "
+                    f"({other.start_date.strftime('%d/%m/%Y')} → {other.end_date.strftime('%d/%m/%Y')})."
+                )
+                return RedirectResponse(
+                    f"/semestres?error={quote(error_msg)}",
+                    status_code=303,
+                )
+
         sem.start_date = start_date
-        sem.end_date = start_date + relativedelta(months=6) - timedelta(days=1)
+        sem.end_date = end_date
     else:
         # Clear dates if start_date removed
         sem.start_date = None
@@ -1050,4 +1080,9 @@ def edit_semester(
     sem.chef_de_service = chef_de_service if chef_de_service else None
     db.commit()
 
+    # Recalculate which semester is current (syncs dashboard)
+    _ensure_semester_blocks(db, user)
+
     return RedirectResponse("/semestres", status_code=303)
+
+
