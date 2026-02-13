@@ -982,6 +982,9 @@ def _ensure_semester_blocks(db: Session, user: User):
         if filled:
             filled[-1].is_current = True
             user.semester = filled[-1].number
+        else:
+            # No semesters have dates — clear stale semester number
+            user.semester = None
 
     db.commit()
     return all_semesters
