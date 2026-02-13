@@ -183,7 +183,7 @@
                         </div>
                         <div class="w-full bg-surface-100 rounded-full h-2">
                             <div class="bg-primary-500 rounded-full h-2 transition-all"
-                                style="width: {{ (cat.count / ns_inter.total * 100)|round|int }}%"></div>
+                                style="width: {{ (cat.count / ns_inter.total * 100)|round|int if ns_inter.total > 0 else 0 }}%"></div>
                         </div>
                     </div>
                     <svg class="w-4 h-4 text-gray-400 transition-transform flex-shrink-0" :class="open && 'rotate-180'"
@@ -242,7 +242,7 @@
                         </div>
                         <div class="w-full bg-surface-100 rounded-full h-2">
                             <div class="bg-emerald-400 rounded-full h-2 transition-all"
-                                style="width: {{ (cat.count / ns_gesture.total * 100)|round|int }}%"></div>
+                                style="width: {{ (cat.count / ns_gesture.total * 100)|round|int if ns_gesture.total > 0 else 0 }}%"></div>
                         </div>
                     </div>
                     <svg class="w-4 h-4 text-gray-400 transition-transform flex-shrink-0" :class="open && 'rotate-180'"
@@ -300,7 +300,7 @@
                         </div>
                         <div class="w-full bg-surface-100 rounded-full h-2">
                             <div class="bg-red-400 rounded-full h-2 transition-all"
-                                style="width: {{ (cat.count / ns_compl.total * 100)|round|int }}%"></div>
+                                style="width: {{ (cat.count / ns_compl.total * 100)|round|int if ns_compl.total > 0 else 0 }}%"></div>
                         </div>
                     </div>
                     <svg class="w-4 h-4 text-gray-400 transition-transform flex-shrink-0" :class="open && 'rotate-180'"

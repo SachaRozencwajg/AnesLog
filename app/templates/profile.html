@@ -133,7 +133,7 @@
                     </div>
                     <div class="w-full bg-gray-200 rounded-full h-1.5">
                         <div class="bg-primary-500 h-1.5 rounded-full transition-all"
-                            style="width: {{ ((days_elapsed / days_total) * 100) | int }}%"></div>
+                            style="width: {{ ((days_elapsed / days_total) * 100) | int if days_total else 0 }}%"></div>
                     </div>
                 </div>
                 {% endif %}
