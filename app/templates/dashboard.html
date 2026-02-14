@@ -531,6 +531,160 @@
     #}
 
     <!-- ================================================================= -->
+    <!-- Répartition par spécialité (interventions)                         -->
+    <!-- ================================================================= -->
+    {% if specialty_distribution %}
+    <div class="bg-white rounded-2xl p-5 border border-surface-200 mb-4 shadow-sm">
+        <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+                <span class="text-base">📊</span>
+                <h2 class="text-sm font-semibold text-gray-700">Répartition par spécialité</h2>
+            </div>
+            <span class="text-xs text-gray-400">{{ total_interventions }} intervention{{ 's' if total_interventions > 1
+                }}</span>
+        </div>
+        <!-- Stacked bar -->
+        <div class="flex w-full h-7 rounded-lg overflow-hidden mb-3">
+            {% for spec in specialty_distribution %}
+            <div class="flex items-center justify-center text-white text-[10px] font-semibold transition-all relative group"
+                style="width: {{ spec.pct }}%; background-color: {{ spec.color }}; min-width: {% if spec.pct >= 8 %}0{% else %}18px{% endif %};"
+                title="{{ spec.name }}: {{ spec.count }} ({{ spec.pct }}%)">
+                {% if spec.pct >= 12 %}
+                <span class="truncate px-1">{{ spec.name }} {{ spec.pct }}%</span>
+                {% elif spec.pct >= 6 %}
+                <span class="truncate px-0.5">{{ spec.pct }}%</span>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        <!-- Legend -->
+        <div class="flex flex-wrap gap-x-4 gap-y-1 mb-2">
+            {% for spec in specialty_distribution %}
+            <div class="flex items-center gap-1.5 text-xs text-gray-600">
+                <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background-color: {{ spec.color }}"></span>
+                <span class="truncate">{{ spec.name }}</span>
+                <span class="text-gray-400 font-medium">{{ spec.count }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% if spec_concentrated %}
+        <div class="flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-1.5 mt-1">
+            <span>💡</span>
+            <span>80% de tes interventions sont concentrées en {{
+                specialty_distribution[:2]|map(attribute='name')|join(' et ') }}</span>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- ================================================================= -->
+    <!-- Progression par geste (learning procedures, max 3)                 -->
+    <!-- ================================================================= -->
+    {% if gesture_progression %}
+    <div class="bg-white rounded-2xl p-5 border border-surface-200 mb-4 shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-2">
+                <span class="text-base">📈</span>
+                <h2 class="text-sm font-semibold text-gray-700">Progression par geste</h2>
+            </div>
+            <a href="/mon-desar" class="text-xs text-primary-600 font-medium hover:text-primary-700">Voir tout →</a>
+        </div>
+        <div class="space-y-4">
+            {% for geste in gesture_progression %}
+            <div class="border border-surface-100 rounded-xl p-3">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="min-w-0">
+                        <span class="text-sm font-medium text-gray-800 truncate block">{{ geste.name }}</span>
+                        <span class="text-[10px] text-gray-400">{{ geste.category }}</span>
+                    </div>
+                    <span
+                        class="text-xs font-semibold text-gray-500 bg-surface-100 px-2 py-0.5 rounded-full flex-shrink-0 ml-2">
+                        {{ geste.log_count }} acte{{ 's' if geste.log_count > 1 }}
+                    </span>
+                </div>
+                <!-- Timeline dots -->
+                <div class="flex items-center gap-1.5 overflow-x-auto pb-1">
+                    {% for point in geste.timeline %}
+                    {% set dot_color = {
+                    'Observé': 'bg-amber-300',
+                    'Assisté': 'bg-blue-300',
+                    'Supervisé': 'bg-teal-400',
+                    'Autonome': 'bg-green-500'
+                    } %}
+                    <div class="flex flex-col items-center gap-0.5 flex-shrink-0"
+                        title="{{ point.level }} — {{ point.date }}">
+                        <div
+                            class="w-4 h-4 rounded-full {{ dot_color.get(point.level, 'bg-gray-300') }} flex items-center justify-center">
+                            {% if point.level == 'Autonome' %}
+                            <svg class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd"
+                                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                    clip-rule="evenodd" />
+                            </svg>
+                            {% endif %}
+                        </div>
+                        <span class="text-[8px] text-gray-400 leading-none">{{ point.date }}</span>
+                    </div>
+                    {% if not loop.last %}
+                    <div class="w-2 h-px bg-surface-200 flex-shrink-0 mt-[-8px]"></div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+                <!-- Legend inline -->
+                <div class="flex gap-3 mt-2 pt-2 border-t border-surface-100">
+                    <span class="flex items-center gap-1 text-[9px] text-gray-400"><span
+                            class="w-2 h-2 rounded-full bg-amber-300"></span>Obs</span>
+                    <span class="flex items-center gap-1 text-[9px] text-gray-400"><span
+                            class="w-2 h-2 rounded-full bg-blue-300"></span>Ass</span>
+                    <span class="flex items-center gap-1 text-[9px] text-gray-400"><span
+                            class="w-2 h-2 rounded-full bg-teal-400"></span>Sup</span>
+                    <span class="flex items-center gap-1 text-[9px] text-gray-400"><span
+                            class="w-2 h-2 rounded-full bg-green-500"></span>Aut</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ================================================================= -->
+    <!-- Zones blanches (after 30% semester elapsed)                        -->
+    <!-- ================================================================= -->
+    {% if blind_spots and semester_progress_pct >= 30 %}
+    <div class="bg-white rounded-2xl p-5 border border-surface-200 mb-4 shadow-sm">
+        <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+                <span class="text-base">🔍</span>
+                <h2 class="text-sm font-semibold text-gray-700">Zones blanches</h2>
+            </div>
+            <span class="text-xs text-gray-400 bg-red-50 text-red-500 px-2 py-0.5 rounded-full font-medium">
+                {{ blind_spots|length }} acte{{ 's' if blind_spots|length > 1 }}
+            </span>
+        </div>
+        <p class="text-xs text-gray-400 mb-3">Actes disponibles pour ton stage que tu n'as pas encore réalisés.</p>
+        <div class="space-y-1.5">
+            {% for spot in blind_spots[:8] %}
+            <div class="flex items-center gap-2.5 py-1.5 px-2 -mx-1 rounded-lg hover:bg-surface-50 transition">
+                <span class="w-2 h-2 rounded-full bg-red-400 flex-shrink-0"></span>
+                <span class="text-sm text-gray-700 truncate flex-1">{{ spot.name }}</span>
+                <span class="text-[10px] text-gray-400 bg-surface-100 px-1.5 py-0.5 rounded flex-shrink-0">{{
+                    spot.category }}</span>
+            </div>
+            {% endfor %}
+            {% if blind_spots|length > 8 %}
+            <div class="text-xs text-gray-400 text-center pt-1">
+                … et {{ blind_spots|length - 8 }} autre{{ 's' if blind_spots|length - 8 > 1 }}
+            </div>
+            {% endif %}
+        </div>
+        <div class="text-xs text-gray-400 mt-3 pt-2 border-t border-surface-100">
+            {{ blind_spots|length }} acte{{ 's' if blind_spots|length > 1 }} jamais réalisé{{ 's' if blind_spots|length
+            > 1 }} sur {{ blind_spots_total }} disponibles
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ================================================================= -->
     <!-- Recent Activity (semester-scoped)                                  -->
     <!-- ================================================================= -->
     {% if recent_logs %}

@@ -316,6 +316,139 @@ def dashboard(
         sec = cat.section or "intervention"
         categories_by_section[sec].append(cat)
 
+    # -------------------------------------------------------------------
+    # NEW: Specialty distribution (interventions only, this semester)
+    # -------------------------------------------------------------------
+    specialty_distribution = []
+    intervention_stats = category_stats_by_section.get("intervention", [])
+    total_interventions = sum(s["count"] for s in intervention_stats)
+    if total_interventions > 0:
+        # Predefined color palette for specialties
+        spec_colors = [
+            "#0d9488", "#3b82f6", "#8b5cf6", "#f59e0b",
+            "#ef4444", "#ec4899", "#10b981", "#6366f1",
+        ]
+        for i, stat in enumerate(intervention_stats):
+            if stat["count"] > 0:
+                pct = round(stat["count"] / total_interventions * 100)
+                specialty_distribution.append({
+                    "name": stat["name"],
+                    "count": stat["count"],
+                    "pct": pct,
+                    "color": spec_colors[i % len(spec_colors)],
+                })
+        # Sort by count descending
+        specialty_distribution.sort(key=lambda x: -x["count"])
+
+    # Insight: are ≥80% of interventions concentrated in ≤2 specialties?
+    spec_concentrated = False
+    if len(specialty_distribution) > 2:
+        top2_pct = sum(s["pct"] for s in specialty_distribution[:2])
+        spec_concentrated = top2_pct >= 80
+
+    # -------------------------------------------------------------------
+    # NEW: Gesture progression (learning procedures only, max 3)
+    # -------------------------------------------------------------------
+    mastery_levels = compute_procedure_mastery_levels(db, user.id, user.team_id, category)
+    gesture_progression = []
+    # Filter to learning procedures only (has logs but not mastered/locked)
+    learning_procs = [
+        info for info in mastery_levels.values()
+        if info["level"] == "learning" and not info["is_complication"]
+    ]
+    # Sort by log count descending (most advanced first)
+    learning_procs.sort(key=lambda x: -x["log_count"])
+
+    for info in learning_procs[:3]:
+        proc = info["procedure"]
+        # Get chronological logs for this procedure to build timeline
+        proc_logs = (
+            db.query(ProcedureLog.autonomy_level, ProcedureLog.date)
+            .filter(
+                ProcedureLog.user_id == user.id,
+                ProcedureLog.procedure_id == proc.id,
+            )
+            .order_by(ProcedureLog.date.asc())
+            .all()
+        )
+        timeline = []
+        for log_level, log_date in proc_logs:
+            timeline.append({
+                "level": log_level or "Observé",
+                "date": log_date.strftime("%d/%m") if log_date else "",
+            })
+        gesture_progression.append({
+            "name": proc.name,
+            "category": proc.category.name if proc.category else "",
+            "log_count": info["log_count"],
+            "mastery_count": info["mastery_count"],
+            "timeline": timeline,
+        })
+
+    # -------------------------------------------------------------------
+    # NEW: Blind spots (procedures never done, after 30% semester elapsed)
+    # -------------------------------------------------------------------
+    semester_progress_pct = 0
+    if days_total and days_total > 0 and days_elapsed is not None:
+        semester_progress_pct = round(days_elapsed / days_total * 100)
+
+    blind_spots = []
+    blind_spots_total_available = 0
+    if semester_progress_pct >= 30:
+        # Get all accessible procedures (interventions + gestures, no complications)
+        all_accessible = [
+            info for info in mastery_levels.values()
+            if not info["is_complication"]
+        ]
+        # Also include gesture procedures (mastery_levels only covers interventions)
+        gesture_procs_q = (
+            db.query(Procedure)
+            .join(Category)
+            .filter(
+                Category.section == "gesture",
+                or_(Procedure.team_id == None, Procedure.team_id == user.team_id),
+            )
+            .all()
+        )
+        # Get log counts for gesture procedures
+        gesture_log_counts = {}
+        if gesture_procs_q:
+            gesture_ids = [p.id for p in gesture_procs_q]
+            gesture_logs_raw = (
+                db.query(ProcedureLog.procedure_id, func.count(ProcedureLog.id))
+                .filter(
+                    ProcedureLog.user_id == user.id,
+                    ProcedureLog.procedure_id.in_(gesture_ids),
+                )
+                .group_by(ProcedureLog.procedure_id)
+                .all()
+            )
+            gesture_log_counts = {pid: cnt for pid, cnt in gesture_logs_raw}
+
+        # Intervention blind spots (from mastery_levels)
+        for info in all_accessible:
+            if info["level"] == "not_started":
+                blind_spots.append({
+                    "name": info["procedure"].name,
+                    "category": info["procedure"].category.name if info["procedure"].category else "",
+                    "section": "intervention",
+                })
+
+        # Gesture blind spots
+        for gp in gesture_procs_q:
+            if gesture_log_counts.get(gp.id, 0) == 0:
+                # Check not locked/mastered
+                is_locked = gp.id in locked_ids
+                is_mastered = gp.id in mastered_ids
+                if not is_locked and not is_mastered:
+                    blind_spots.append({
+                        "name": gp.name,
+                        "category": gp.category.name if gp.category else "",
+                        "section": "gesture",
+                    })
+
+        blind_spots_total_available = len(all_accessible) + len(gesture_procs_q)
+
     return templates.TemplateResponse(
         "dashboard.html",
         {
@@ -343,6 +476,14 @@ def dashboard(
             "next_semester": next_semester,
             "days_until_next": days_until_next,
             "last_semester": last_semester,
+            # New stats
+            "specialty_distribution": specialty_distribution,
+            "total_interventions": total_interventions,
+            "spec_concentrated": spec_concentrated,
+            "gesture_progression": gesture_progression,
+            "blind_spots": blind_spots,
+            "blind_spots_total": blind_spots_total_available,
+            "semester_progress_pct": semester_progress_pct,
         },
     )
 
