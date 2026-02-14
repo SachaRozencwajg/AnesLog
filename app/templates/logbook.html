@@ -80,7 +80,7 @@
                     Tous
                 </a>
                 {% for level, color_class in [("Observé", "bg-amber-400"), ("Assisté", "bg-blue-400"), ("Supervisé",
-                "bg-emerald-400"), ("Autonome", "bg-green-500"), ("Participé", "bg-orange-400"), ("Géré", "bg-red-400")]
+                "bg-emerald-400"), ("Autonome", "bg-green-500")]
                 %}
                 {% set is_active = selected_autonomy == level %}
                 <a href="/mon-carnet?autonomie={{ level|urlencode }}{% if selected_section %}&section={{ selected_section }}{% endif %}{% if selected_category %}&categorie={{ selected_category }}{% endif %}{% if selected_semester %}&semestre={{ selected_semester }}{% endif %}"
