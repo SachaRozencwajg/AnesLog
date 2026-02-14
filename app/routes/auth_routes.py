@@ -8,7 +8,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import User, UserRole, Team, Invitation, InvitationStatus
+from app.models import User, UserRole, Service, Invitation, InvitationStatus
 from app.auth import (
     hash_password, verify_password, create_access_token,
     get_optional_user, create_reset_token, verify_reset_token,
@@ -54,7 +54,7 @@ def login_submit(
     if not user.is_approved:
         return templates.TemplateResponse(
             "login.html",
-            {"request": request, "error": "Votre compte est en attente de validation par un senior de l'équipe."}
+            {"request": request, "error": "Votre compte est en attente de validation par un senior du service."}
         )
     
     # Create session
@@ -80,27 +80,27 @@ def login_submit(
 @router.get("/inscription")
 def register_page(
     request: Request, 
-    team_id: str | None = None,
+    service_id: str | None = None,
     token: str | None = None,
     db: Session = Depends(get_db)
 ):
-    teams = db.query(Team).order_by(Team.name).all()
+    services = db.query(Service).order_by(Service.name).all()
     
     preselected_email = None
-    preselected_team_id = team_id
+    preselected_service_id = service_id
     
     if token:
         payload = verify_invitation_token(token)
         if payload:
             preselected_email = payload["sub"]
-            preselected_team_id = payload["team_id"]
+            preselected_service_id = payload["service_id"]
             
     return templates.TemplateResponse(
         "register.html", 
         {
             "request": request, 
-            "teams": teams, 
-            "preselected_team_id": preselected_team_id,
+            "services": services, 
+            "preselected_service_id": preselected_service_id,
             "preselected_email": preselected_email,
             "invitation_token": token if preselected_email else None
         }
@@ -115,22 +115,22 @@ async def register_submit(
     password: str = Form(...),
     role: str = Form(...),
     full_name: str = Form(None),
-    team_id: str = Form(None),
-    new_team_name: str = Form(None),
+    service_id: str = Form(None),
+    new_service_name: str = Form(None),
     invitation_token: str = Form(None),
     db: Session = Depends(get_db),
 ):
     # Check existing email
     existing_user = db.query(User).filter(User.email == email).first()
     if existing_user:
-        teams = db.query(Team).order_by(Team.name).all()
+        services = db.query(Service).order_by(Service.name).all()
         return templates.TemplateResponse(
             "register.html",
-            {"request": request, "error": "Cet email est déjà utilisé.", "teams": teams}
+            {"request": request, "error": "Cet email est déjà utilisé.", "services": services}
         )
 
     # Defaults
-    final_team_id = None
+    final_service_id = None
     is_approved_status = False
     is_active_status = False
     
@@ -140,7 +140,7 @@ async def register_submit(
         payload = verify_invitation_token(invitation_token)
         if payload and payload["sub"] == email:
             valid_invitation = True
-            final_team_id = payload["team_id"]
+            final_service_id = payload["service_id"]
             user_role = UserRole.resident # Force resident role for invitations
             is_approved_status = True # Auto-approve
             is_active_status = True # Skip email verification
@@ -157,66 +157,66 @@ async def register_submit(
         try:
             user_role = UserRole(role)
         except ValueError:
-            teams = db.query(Team).order_by(Team.name).all()
+            services = db.query(Service).order_by(Service.name).all()
             return templates.TemplateResponse(
                 "register.html",
-                {"request": request, "error": "Rôle invalide.", "teams": teams}
+                {"request": request, "error": "Rôle invalide.", "services": services}
             )
 
         if not full_name:
-             teams = db.query(Team).order_by(Team.name).all()
+             services = db.query(Service).order_by(Service.name).all()
              return templates.TemplateResponse(
                 "register.html",
-                {"request": request, "error": "Votre nom est requis.", "teams": teams}
+                {"request": request, "error": "Votre nom est requis.", "services": services}
             )
 
-        # Team Logic (Standard)
+        # Service Logic (Standard)
         if user_role == UserRole.senior:
-            # Senior is auto-approved in the team they create/join (simplification)
+            # Senior is auto-approved in the service they create/join
             is_approved_status = True
             
-            if new_team_name and new_team_name.strip():
-                # Create new team
-                existing_team = db.query(Team).filter(Team.name == new_team_name.strip()).first()
-                if existing_team:
-                    teams = db.query(Team).order_by(Team.name).all()
+            if new_service_name and new_service_name.strip():
+                # Create new service
+                existing_service = db.query(Service).filter(Service.name == new_service_name.strip()).first()
+                if existing_service:
+                    services = db.query(Service).order_by(Service.name).all()
                     return templates.TemplateResponse(
                         "register.html",
-                        {"request": request, "error": "Une équipe avec ce nom existe déjà.", "teams": teams}
+                        {"request": request, "error": "Un service avec ce nom existe déjà.", "services": services}
                     )
                 
-                new_team = Team(name=new_team_name.strip())
-                db.add(new_team)
+                new_service = Service(name=new_service_name.strip())
+                db.add(new_service)
                 db.commit()
-                db.refresh(new_team)
-                final_team_id = new_team.id
+                db.refresh(new_service)
+                final_service_id = new_service.id
                 
-            elif team_id:
-                # Join existing team
-                final_team_id = int(team_id)
+            elif service_id:
+                # Join existing service
+                final_service_id = int(service_id)
             else:
                 # Did not select or create
-                teams = db.query(Team).order_by(Team.name).all()
+                services = db.query(Service).order_by(Service.name).all()
                 return templates.TemplateResponse(
                     "register.html",
-                    {"request": request, "error": "Veuillez sélectionner une équipe ou en créer une.", "teams": teams}
+                    {"request": request, "error": "Veuillez sélectionner un service ou en créer un.", "services": services}
                 )
 
         elif user_role == UserRole.resident:
-            # Resident must join existing team
-            if not team_id:
-                teams = db.query(Team).order_by(Team.name).all()
+            # Resident must join existing service
+            if not service_id:
+                services = db.query(Service).order_by(Service.name).all()
                 return templates.TemplateResponse(
                     "register.html", 
-                    {"request": request, "error": "Veuillez sélectionner votre équipe.", "teams": teams}
+                    {"request": request, "error": "Veuillez sélectionner votre service.", "services": services}
                 )
-            final_team_id = int(team_id)
+            final_service_id = int(service_id)
             is_approved_status = False # Pending senior approval
             
             # Check for legacy invitation record (if no token used but email matches)
             invitation = db.query(Invitation).filter(
                 Invitation.email == email,
-                Invitation.team_id == final_team_id,
+                Invitation.service_id == final_service_id,
                 Invitation.status == InvitationStatus.pending
             ).first()
 
@@ -231,7 +231,7 @@ async def register_submit(
         full_name=full_name,
         role=user_role,
         is_active=is_active_status,
-        team_id=final_team_id,
+        service_id=final_service_id,
         is_approved=is_approved_status
     )
     db.add(new_user)
@@ -240,7 +240,7 @@ async def register_submit(
     if valid_invitation:
          invitation_record = db.query(Invitation).filter(
             Invitation.email == email, 
-            Invitation.team_id == final_team_id
+            Invitation.service_id == final_service_id
         ).first()
          if invitation_record:
              invitation_record.status = InvitationStatus.accepted
@@ -275,7 +275,7 @@ async def register_submit(
         <body style="font-family: Arial, sans-serif; color: #333;">
             <h2>Bienvenue Dr. {full_name} !</h2>
             <p>Votre compte Senior a été créé sur AnesLog.</p>
-            <p>Vous avez rejoint l'équipe.</p>
+            <p>Vous avez rejoint le service.</p>
             <p><strong>Action requise :</strong> Pour activer votre compte, veuillez cliquer sur le lien ci-dessous :</p>
             <p style="text-align: center; margin: 20px 0;">
                 <a href="{verify_link}" style="background-color: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Confirmer mon email</a>
@@ -285,16 +285,16 @@ async def register_submit(
         """
     else:
         subject = "Bienvenue sur AnesLog - Confirmez votre compte"
-        # Can fetch team name for email
-        team_obj = db.query(Team).get(final_team_id)
-        team_name = team_obj.name if team_obj else "votre équipe"
+        # Can fetch service name for email
+        service_obj = db.query(Service).get(final_service_id)
+        service_name = service_obj.display_name if service_obj else "votre service"
         
         body = f"""
         <html>
         <body style="font-family: Arial, sans-serif; color: #333;">
             <h2>Bienvenue {full_name} !</h2>
-            <p>Votre demande pour rejoindre l'équipe <strong>{team_name}</strong> a été enregistrée.</p>
-            <p>Une fois votre email confirmé, un Senior de l'équipe devra valider votre demande.</p>
+            <p>Votre demande pour rejoindre le service <strong>{service_name}</strong> a été enregistrée.</p>
+            <p>Une fois votre email confirmé, un Senior du service devra valider votre demande.</p>
             <p><strong>Action requise :</strong> Pour confirmer votre email, veuillez cliquer sur le lien ci-dessous :</p>
             <p style="text-align: center; margin: 20px 0;">
                 <a href="{verify_link}" style="background-color: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Confirmer mon email</a>

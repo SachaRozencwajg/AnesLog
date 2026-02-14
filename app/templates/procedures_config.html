@@ -41,7 +41,7 @@
         <div class="p-4 bg-surface-50 border-b border-surface-200 flex justify-between items-center">
             <div class="flex items-center gap-3">
                 <h3 class="text-lg font-bold text-gray-900">{{ cat.name }}</h3>
-                {% if not cat.team_id %}
+                {% if not cat.service_id %}
                 <span
                     class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-600 rounded-full border border-gray-200">Global</span>
                 {% else %}
@@ -49,7 +49,7 @@
                     class="px-2 py-1 text-xs font-medium bg-secondary-100 text-secondary-700 rounded-full border border-secondary-200">Équipe</span>
                 {% endif %}
             </div>
-            {% if allow_delete_cat and cat.team_id == user.team_id %}
+            {% if allow_delete_cat and cat.service_id == user.service_id %}
             <form action="/equipe/actes/categories/{{ cat.id }}/supprimer" method="post" @submit="saveScroll()"
                 onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cette catégorie et tous ses actes ?');">
                 <button type="submit"
@@ -71,13 +71,13 @@
                 {% for item in items %}
                 <div
                     class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors
-                        {% if item.team_id %} border-secondary-200 bg-secondary-50 text-secondary-900 {% else %} border-gray-200 bg-gray-50 text-gray-700 {% endif %}">
+                        {% if item.service_id %} border-secondary-200 bg-secondary-50 text-secondary-900 {% else %} border-gray-200 bg-gray-50 text-gray-700 {% endif %}">
                     <span class="text-sm font-medium">{{ item.name }}</span>
                     {% if item.competency and item.competency.domain %}
                     <span class="text-xs px-1.5 py-0.5 rounded bg-primary-100 text-primary-600 font-medium">{{
                         item.competency.domain.code }}</span>
                     {% endif %}
-                    {% if item.team_id == user.team_id %}
+                    {% if item.service_id == user.service_id %}
                     <form action="/equipe/actes/procedures/{{ item.id }}/supprimer" method="post"
                         class="inline flex items-center" @submit="saveScroll()">
                         <button type="submit" class="text-gray-400 hover:text-red-500 ml-1 focus:outline-none"
@@ -96,7 +96,7 @@
             </div>
 
             <!-- Add Item Form -->
-            {% if cat.team_id == user.team_id or not cat.team_id %}
+            {% if cat.service_id == user.service_id or not cat.service_id %}
             <form action="/equipe/actes/procedures" method="post" class="flex flex-col sm:flex-row gap-3 items-end mt-4"
                 @submit="saveFocus('item-input-{{ cat.id }}')">
                 <input type="hidden" name="category_id" value="{{ cat.id }}">

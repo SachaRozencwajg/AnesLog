@@ -40,58 +40,57 @@ def run_postgres_migrations():
                 conn.execute(text("ALTER TABLE users ADD COLUMN desar_start_date DATE;"))
                 conn.commit()
 
-            # Check teams table
+            # Check services table
             try:
-                conn.execute(text("SELECT 1 FROM teams LIMIT 1;"))
+                conn.execute(text("SELECT 1 FROM services LIMIT 1;"))
             except Exception:
-                print("Migration: Creating teams table.")
-                # We are inside a transaction? explicitly commit previous or use begin?
-                # engine.connect() creates a connection. Default not autocommit.
-                # If exception happened (table undefined), transaction might be aborted.
-                # So we catch specific DBAPIError or just proceed if we assume it doesn't exist?
-                # With 'create table if not exists' inside a raw SQL we avoid check.
+                print("Migration: Creating services table.")
                 pass
             
             # Safe CREATE TABLE IF NOT EXISTS
             conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS teams (
+                CREATE TABLE IF NOT EXISTS services (
                     id SERIAL PRIMARY KEY,
                     name VARCHAR(255) UNIQUE NOT NULL,
+                    hospital VARCHAR(255),
+                    city VARCHAR(255),
+                    region VARCHAR(255),
+                    slug VARCHAR(255) UNIQUE,
                     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
                 );
             """))
             conn.commit()
 
-            # Check users.team_id
-            result = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name='team_id';"))
+            # Check users.service_id
+            result = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name='service_id';"))
             if not result.fetchone():
-                print("Migration: Adding team columns to users.")
-                conn.execute(text("ALTER TABLE users ADD COLUMN team_id INTEGER REFERENCES teams(id);"))
+                print("Migration: Adding service columns to users.")
+                conn.execute(text("ALTER TABLE users ADD COLUMN service_id INTEGER REFERENCES services(id);"))
                 conn.execute(text("ALTER TABLE users ADD COLUMN is_approved BOOLEAN DEFAULT FALSE;"))
                 
                 # SEED LOGIC
-                print("Migration: Seeding initial team.")
-                conn.execute(text("INSERT INTO teams (name) VALUES ('Marie Lannelongue - Anesthésie') ON CONFLICT (name) DO NOTHING;"))
+                print("Migration: Seeding initial service.")
+                conn.execute(text("INSERT INTO services (name, hospital, city, region, slug) VALUES ('Anesthésie', 'Hôpital Marie Lannelongue', 'Le Plessis-Robinson', 'Île-de-France', 'anesthesie-hopital-marie-lannelongue') ON CONFLICT (name) DO NOTHING;"))
                 
                 # Assign users
-                res = conn.execute(text("SELECT id FROM teams WHERE name = 'Marie Lannelongue - Anesthésie';"))
-                team_row = res.fetchone()
-                if team_row:
-                    team_id = team_row[0]
+                res = conn.execute(text("SELECT id FROM services WHERE slug = 'anesthesie-hopital-marie-lannelongue';"))
+                service_row = res.fetchone()
+                if service_row:
+                    service_id = service_row[0]
                     target_emails = ['srozencwajg@ghpsj.fr', 'jupo9809@gmail.com', 'sacha.rozencwajg@gmail.com']
                     for email in target_emails:
-                        conn.execute(text(f"UPDATE users SET team_id = {team_id}, is_approved = TRUE WHERE email = '{email}';"))
+                        conn.execute(text(f"UPDATE users SET service_id = {service_id}, is_approved = TRUE WHERE email = '{email}';"))
                 
                 conn.commit()
-                print("Migration: Team seed complete.")
+                print("Migration: Service seed complete.")
             else:
-                print("Migration: 'team_id' column already exists in users.")
+                print("Migration: 'service_id' column already exists in users.")
 
-            # Check categories.team_id
-            result = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='categories' AND column_name='team_id';"))
+            # Check categories.service_id
+            result = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='categories' AND column_name='service_id';"))
             if not result.fetchone():
-                print("Migration: Adding team_id to categories.")
-                conn.execute(text("ALTER TABLE categories ADD COLUMN team_id INTEGER REFERENCES teams(id);"))
+                print("Migration: Adding service_id to categories.")
+                conn.execute(text("ALTER TABLE categories ADD COLUMN service_id INTEGER REFERENCES services(id);"))
                 
                 # Drop unique constraint on name (categories_name_key)
                 try:
@@ -102,11 +101,11 @@ def run_postgres_migrations():
                 
                 conn.commit()
 
-            # Check procedures.team_id
-            result = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='procedures' AND column_name='team_id';"))
+            # Check procedures.service_id
+            result = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='procedures' AND column_name='service_id';"))
             if not result.fetchone():
-                print("Migration: Adding team_id to procedures.")
-                conn.execute(text("ALTER TABLE procedures ADD COLUMN team_id INTEGER REFERENCES teams(id);"))
+                print("Migration: Adding service_id to procedures.")
+                conn.execute(text("ALTER TABLE procedures ADD COLUMN service_id INTEGER REFERENCES services(id);"))
                 conn.commit()
 
             # Check invitations table
@@ -119,7 +118,7 @@ def run_postgres_migrations():
                 CREATE TABLE IF NOT EXISTS invitations (
                     id SERIAL PRIMARY KEY,
                     email VARCHAR(255) NOT NULL,
-                    team_id INTEGER REFERENCES teams(id),
+                    service_id INTEGER REFERENCES services(id),
                     status VARCHAR(50) DEFAULT 'pending',
                     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
                 );
@@ -213,22 +212,22 @@ def run_postgres_migrations():
                     conn.execute(text(f"ALTER TABLE procedure_competences ADD COLUMN {col_name} {col_def};"))
                     conn.commit()
 
-            # Create team_procedure_thresholds table
+            # Create service_procedure_thresholds table
             conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS team_procedure_thresholds (
+                CREATE TABLE IF NOT EXISTS service_procedure_thresholds (
                     id SERIAL PRIMARY KEY,
-                    team_id INTEGER NOT NULL REFERENCES teams(id),
+                    service_id INTEGER NOT NULL REFERENCES services(id),
                     procedure_id INTEGER NOT NULL REFERENCES procedures(id),
                     min_procedures INTEGER NOT NULL DEFAULT 5,
                     max_procedures INTEGER NOT NULL DEFAULT 15
                 );
             """))
             conn.execute(text(
-                "CREATE INDEX IF NOT EXISTS ix_team_proc_thresholds_team_proc "
-                "ON team_procedure_thresholds (team_id, procedure_id);"
+                "CREATE INDEX IF NOT EXISTS ix_service_proc_thresholds_service_proc "
+                "ON service_procedure_thresholds (service_id, procedure_id);"
             ))
             conn.commit()
-            print("Migration: team_procedure_thresholds table ready.")
+            print("Migration: service_procedure_thresholds table ready.")
 
             # Create semesters table (DESAR tracking) — must be BEFORE FK columns
             conn.execute(text("""
@@ -241,7 +240,7 @@ def run_postgres_migrations():
                     end_date DATE,
                     hospital VARCHAR(255),
                     service VARCHAR(255),
-                    team_id INTEGER REFERENCES teams(id),
+                    service_id INTEGER REFERENCES services(id),
                     is_current BOOLEAN NOT NULL DEFAULT FALSE,
                     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
                 );
@@ -255,7 +254,7 @@ def run_postgres_migrations():
                     id SERIAL PRIMARY KEY,
                     user_id INTEGER NOT NULL REFERENCES users(id),
                     date DATE NOT NULL,
-                    guard_type VARCHAR(50) NOT NULL DEFAULT 'Garde 24h',
+                    guard_type VARCHAR(50) NOT NULL DEFAULT 'Garde',
                     semester_id INTEGER REFERENCES semesters(id),
                     notes TEXT,
                     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

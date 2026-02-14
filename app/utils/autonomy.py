@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.models import (
-    ProcedureLog, ProcedureCompetence, TeamProcedureThreshold,
+    ProcedureLog, ProcedureCompetence, ServiceProcedureThreshold,
     Procedure, Category, AutonomyLevel, ComplicationRole, User
 )
 from sqlalchemy import or_
@@ -32,7 +32,7 @@ MASTERY_VALUES = {AUTONOMY_AUTONOMOUS, COMPLICATION_MANAGED}
 def compute_procedure_mastery_levels(
     db: Session,
     user_id: int,
-    team_id: int | None = None,
+    service_id: int | None = None,
     category_id: int | None = None,
     section: str | None = None,
 ) -> dict[int, dict]:
@@ -66,10 +66,10 @@ def compute_procedure_mastery_levels(
     proc_q = db.query(Procedure).join(Category)
     if category_id:
         proc_q = proc_q.filter(Category.id == category_id)
-    if team_id:
-        proc_q = proc_q.filter(or_(Procedure.team_id == None, Procedure.team_id == team_id))
+    if service_id:
+        proc_q = proc_q.filter(or_(Procedure.service_id == None, Procedure.service_id == service_id))
     else:
-        proc_q = proc_q.filter(Procedure.team_id == None)
+        proc_q = proc_q.filter(Procedure.service_id == None)
     # Section filter
     if section:
         proc_q = proc_q.filter(Category.section == section)
@@ -131,7 +131,7 @@ def compute_procedure_mastery_levels(
 def compute_acquisition_stats(
     db: Session,
     user_id: int,
-    team_id: int | None = None,
+    service_id: int | None = None,
     category_id: int | None = None,
 ) -> dict:
     """
@@ -145,7 +145,7 @@ def compute_acquisition_stats(
         "total": int,        # Total procedures
     }
     """
-    levels = compute_procedure_mastery_levels(db, user_id, team_id, category_id)
+    levels = compute_procedure_mastery_levels(db, user_id, service_id, category_id)
 
     stats = {"locked": 0, "mastered": 0, "learning": 0, "not_started": 0}
     for info in levels.values():
@@ -286,7 +286,7 @@ def compute_lc_cusum(logs: list[ProcedureLog], p0: float = 0.3, p1: float = 0.1)
 
 def detect_confidence_alerts(
     db: Session,
-    team_id: int,
+    service_id: int,
     residents: list[User],
 ) -> list[dict]:
     """
@@ -300,8 +300,8 @@ def detect_confidence_alerts(
         - declared_at: log count when autonomy was declared
         - threshold_min / threshold_max
     """
-    thresholds = db.query(TeamProcedureThreshold).filter(
-        TeamProcedureThreshold.team_id == team_id
+    thresholds = db.query(ServiceProcedureThreshold).filter(
+        ServiceProcedureThreshold.service_id == service_id
     ).all()
     
     if not thresholds:
@@ -356,7 +356,7 @@ def detect_confidence_alerts(
 
 def build_autonomy_matrix(
     db: Session,
-    team_id: int,
+    service_id: int,
     residents: list[User],
     category_filter: int | None = None,
 ) -> dict:
@@ -385,13 +385,13 @@ def build_autonomy_matrix(
     if category_filter:
         proc_query = proc_query.filter(Category.id == category_filter)
     proc_query = proc_query.filter(
-        or_(Procedure.team_id == None, Procedure.team_id == team_id)
+        or_(Procedure.service_id == None, Procedure.service_id == service_id)
     )
     procedures = proc_query.order_by(Category.name, Procedure.name).all()
     
     # Get thresholds
-    thresholds_raw = db.query(TeamProcedureThreshold).filter(
-        TeamProcedureThreshold.team_id == team_id
+    thresholds_raw = db.query(ServiceProcedureThreshold).filter(
+        ServiceProcedureThreshold.service_id == service_id
     ).all()
     thresholds = {t.procedure_id: {"min": t.min_procedures, "max": t.max_procedures} for t in thresholds_raw}
     
@@ -491,7 +491,7 @@ def build_autonomy_matrix(
 
 def build_comparison_data(
     db: Session,
-    team_id: int,
+    service_id: int,
     residents: list[User],
     procedure_id: int,
 ) -> dict:
@@ -518,9 +518,9 @@ def build_comparison_data(
     if not procedure:
         return None
     
-    threshold_rec = db.query(TeamProcedureThreshold).filter(
-        TeamProcedureThreshold.team_id == team_id,
-        TeamProcedureThreshold.procedure_id == procedure_id,
+    threshold_rec = db.query(ServiceProcedureThreshold).filter(
+        ServiceProcedureThreshold.service_id == service_id,
+        ServiceProcedureThreshold.procedure_id == procedure_id,
     ).first()
     threshold = {"min": threshold_rec.min_procedures, "max": threshold_rec.max_procedures} if threshold_rec else None
     

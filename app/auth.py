@@ -90,15 +90,15 @@ def verify_verification_token(token: str) -> str | None:
         return None
 
 
-def create_invitation_token(email: str, team_id: int) -> str:
+def create_invitation_token(email: str, service_id: int) -> str:
     """Create an invitation token valid for 7 days."""
     expire = datetime.now(timezone.utc) + timedelta(days=7)
-    payload = {"sub": email, "team_id": team_id, "type": "invitation", "exp": expire}
+    payload = {"sub": email, "service_id": service_id, "type": "invitation", "exp": expire}
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
 def verify_invitation_token(token: str) -> dict | None:
-    """Verify an invitation token and return the payload (email, team_id) if valid."""
+    """Verify an invitation token and return the payload (email, service_id) if valid."""
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         if payload.get("type") != "invitation":

@@ -47,11 +47,12 @@ def run_migrations():
             ("users", "end_date", "DATETIME"),
             ("users", "institution", "VARCHAR(255)"),
             ("users", "is_active", "BOOLEAN DEFAULT 0"),
-            ("users", "team_id", "INTEGER"),
+            ("users", "service_id", "INTEGER"),
+            ("users", "is_service_admin", "BOOLEAN DEFAULT 0"),
             ("users", "is_approved", "BOOLEAN DEFAULT 0"),
             ("users", "is_approved", "BOOLEAN DEFAULT 0"),
-            ("categories", "team_id", "INTEGER"),
-            ("procedures", "team_id", "INTEGER"),
+            ("categories", "service_id", "INTEGER"),
+            ("procedures", "service_id", "INTEGER"),
             ("categories", "section", "VARCHAR(50) DEFAULT 'intervention'"),  # New column
             ("procedure_competences", "senior_validated", "BOOLEAN DEFAULT 0"),
             ("procedure_competences", "senior_validated_date", "DATETIME"),
@@ -137,7 +138,7 @@ def debug_login(email: str = "srozencwajg@ghpsj.fr", db: Session = Depends(get_d
             "role": user.role.value if user.role else None,
             "is_active": user.is_active,
             "is_approved": user.is_approved,
-            "team_id": user.team_id,
+            "service_id": user.service_id,
         }
     except Exception as e:
         return {"status": "error", "detail": str(e), "traceback": traceback.format_exc()}

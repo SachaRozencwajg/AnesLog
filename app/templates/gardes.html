@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Mes Gardes — AnesLog{% endblock %}
+{% block title %}Mes Gardes et Astreintes — AnesLog{% endblock %}
 
 {% block content %}
 <div class="max-w-4xl mx-auto px-4 sm:px-6 py-8">
@@ -8,20 +8,21 @@
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
-            <h1 class="text-2xl font-bold text-primary-900">Mes Gardes</h1>
+            <h1 class="text-2xl font-bold text-primary-900">Mes Gardes et Astreintes</h1>
             <p class="text-sm text-gray-500 mt-1">
                 {% if current_semester %}
-                {{ semester_count }} garde{{ 's' if semester_count != 1 }} ce semestre (S{{ current_semester.number }})
+                {{ semester_count }} garde{{ 's' if semester_count != 1 }} / astreinte{{ 's' if semester_count != 1 }}
+                ce semestre (S{{ current_semester.number }})
                 {% else %}
-                {{ guards | length }} garde{{ 's' if guards | length != 1 }} au total
+                {{ guards | length }} entrée{{ 's' if guards | length != 1 }} au total
                 {% endif %}
             </p>
         </div>
     </div>
 
     <!-- Add guard form -->
-    <div class="bg-white rounded-2xl shadow-sm border border-surface-200 p-6 mb-8">
-        <h2 class="text-sm font-semibold text-gray-700 mb-4">Ajouter une garde</h2>
+    <div class="bg-white rounded-2xl shadow-sm border border-surface-200 p-6 mb-6">
+        <h2 class="text-sm font-semibold text-gray-700 mb-4">Ajouter une garde ou astreinte</h2>
         <form action="/gardes/ajouter" method="post" class="flex flex-col sm:flex-row items-end gap-3">
             <div class="flex-1 w-full sm:w-auto">
                 <label class="block text-xs text-gray-500 mb-1">Date</label>
@@ -49,6 +50,46 @@
         </form>
     </div>
 
+    <!-- Filters -->
+    <div class="flex flex-wrap items-center gap-3 mb-6">
+        <!-- Type filter -->
+        <p class="text-xs text-gray-400">Type</p>
+        <a href="/gardes{% if selected_semester %}?semestre={{ selected_semester }}{% endif %}"
+            class="px-3 py-1.5 rounded-full text-xs font-medium transition-colors
+            {% if not selected_type %}bg-primary-100 text-primary-700{% else %}bg-surface-100 text-gray-500 hover:bg-surface-200{% endif %}">
+            Tous
+        </a>
+        {% for gt in guard_types %}
+        <a href="/gardes?type={{ gt.value|urlencode }}{% if selected_semester %}&semestre={{ selected_semester }}{% endif %}"
+            class="px-3 py-1.5 rounded-full text-xs font-medium transition-colors
+            {% if selected_type == gt.value %}bg-primary-100 text-primary-700{% else %}bg-surface-100 text-gray-500 hover:bg-surface-200{% endif %}">
+            {{ gt.value }}
+        </a>
+        {% endfor %}
+
+        <span class="w-px h-5 bg-surface-200 mx-1"></span>
+
+        <!-- Semester filter -->
+        <p class="text-xs text-gray-400">Semestre</p>
+        <a href="/gardes{% if selected_type %}?type={{ selected_type|urlencode }}{% endif %}"
+            class="px-3 py-1.5 rounded-full text-xs font-medium transition-colors
+            {% if not selected_semester %}bg-primary-100 text-primary-700{% else %}bg-surface-100 text-gray-500 hover:bg-surface-200{% endif %}">
+            Tous
+        </a>
+        {% for sem in semesters %}
+        <a href="/gardes?semestre={{ sem.id }}{% if selected_type %}&type={{ selected_type|urlencode }}{% endif %}"
+            class="px-3 py-1.5 rounded-full text-xs font-medium transition-colors
+            {% if selected_semester == sem.id|string %}bg-primary-100 text-primary-700{% else %}bg-surface-100 text-gray-500 hover:bg-surface-200{% endif %}">
+            S{{ sem.number }}
+        </a>
+        {% endfor %}
+        <a href="/gardes?semestre=hors{% if selected_type %}&type={{ selected_type|urlencode }}{% endif %}"
+            class="px-3 py-1.5 rounded-full text-xs font-medium transition-colors
+            {% if selected_semester == 'hors' %}bg-amber-100 text-amber-700{% else %}bg-surface-100 text-gray-500 hover:bg-surface-200{% endif %}">
+            Hors stage
+        </a>
+    </div>
+
     <!-- Guard list -->
     {% if guards %}
     <div class="bg-white rounded-2xl shadow-sm border border-surface-200 overflow-hidden">
@@ -62,11 +103,22 @@
                 </div>
 
                 <!-- Type badge -->
-                <span class="px-2.5 py-1 rounded-full text-xs font-medium shrink-0
-                    {% if guard.guard_type.value == 'Garde 24h' %}bg-blue-100 text-blue-700
+                <span class="w-20 text-center px-2.5 py-1 rounded-full text-xs font-medium shrink-0
+                    {% if guard.guard_type.value == 'Garde' %}bg-blue-100 text-blue-700
                     {% else %}bg-purple-100 text-purple-700{% endif %}">
                     {{ guard.guard_type.value }}
                 </span>
+
+                <!-- Semester badge -->
+                {% if guard.semester_id %}
+                <span class="px-2 py-0.5 rounded-full text-xs bg-surface-100 text-gray-500 shrink-0">
+                    S{{ guard.semester.number if guard.semester else '?' }}
+                </span>
+                {% else %}
+                <span class="px-2 py-0.5 rounded-full text-xs bg-amber-50 text-amber-600 shrink-0">
+                    Hors stage
+                </span>
+                {% endif %}
 
                 <!-- Notes -->
                 <div class="flex-1 min-w-0">
@@ -79,7 +131,7 @@
 
                 <!-- Delete -->
                 <form action="/gardes/{{ guard.id }}/supprimer" method="post" class="shrink-0"
-                    onsubmit="return confirm('Supprimer cette garde ?')">
+                    onsubmit="return confirm('Supprimer cette entrée ?')">
                     <button type="submit"
                         class="p-1.5 text-gray-300 hover:text-red-500 rounded-lg hover:bg-red-50 transition-all">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -98,8 +150,14 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                 d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
         </svg>
-        <p class="text-sm text-gray-400">Aucune garde enregistrée</p>
-        <p class="text-xs text-gray-300 mt-1">Utilisez le formulaire ci-dessus pour ajouter votre première garde</p>
+        {% if selected_type or selected_semester %}
+        <p class="text-sm text-gray-400">Aucun résultat pour ces filtres</p>
+        <a href="/gardes" class="text-xs text-primary-500 hover:underline mt-1 inline-block">Réinitialiser les
+            filtres</a>
+        {% else %}
+        <p class="text-sm text-gray-400">Aucune garde ni astreinte enregistrée</p>
+        <p class="text-xs text-gray-300 mt-1">Utilisez le formulaire ci-dessus pour ajouter votre première entrée</p>
+        {% endif %}
     </div>
     {% endif %}
 

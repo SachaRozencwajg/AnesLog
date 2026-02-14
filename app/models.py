@@ -3,6 +3,7 @@ SQLAlchemy ORM models for AnesLog.
 
 Domain entities:
 - User (resident or senior)
+- Service (hospital service / department)
 - Category (procedure category, e.g. "Cathéters")
 - Procedure (specific gesture, e.g. "KTC")
 - ProcedureLog (a resident recording they performed a procedure)
@@ -68,7 +69,7 @@ class DesarPhase(str, enum.Enum):
 
 class GuardType(str, enum.Enum):
     """Type of guard shift."""
-    garde_24h = "Garde 24h"
+    garde = "Garde"
     astreinte = "Astreinte"
 
 
@@ -134,18 +135,34 @@ class Competency(Base):
 # Core Models
 # ---------------------------------------------------------------------------
 
-class Team(Base):
+class Service(Base):
     """
-    Medical team (e.g. "Marie Lannelongue - Anesthésie").
+    Hospital service / department (e.g. "Anesthésie — Marie Lannelongue").
+    Replaces the former Team model with richer metadata.
     """
-    __tablename__ = "teams"
+    __tablename__ = "services"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(255), unique=True, nullable=False)
+    name = Column(String(255), nullable=False)                    # Service name, e.g. "Anesthésie"
+    hospital = Column(String(255), nullable=True)                 # Hospital name, e.g. "Marie Lannelongue"
+    city = Column(String(255), nullable=True)                     # City, e.g. "Le Plessis-Robinson"
+    region = Column(String(100), nullable=True)                   # Region, e.g. "Île-de-France"
+    slug = Column(String(255), unique=True, nullable=True)        # URL-friendly slug for the service
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)  # Chef who created the service
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
-    users = relationship("User", back_populates="team")
+    users = relationship("User", back_populates="service", foreign_keys="User.service_id")
+
+    @property
+    def display_name(self):
+        """Human-readable display name combining service and hospital."""
+        if self.hospital:
+            return f"{self.name} — {self.hospital}"
+        return self.name
+
+    def __repr__(self):
+        return f"<Service {self.display_name}>"
 
 
 class User(Base):
@@ -157,10 +174,11 @@ class User(Base):
     full_name = Column(String(255), nullable=False)
     role = Column(SAEnum(UserRole), nullable=False, default=UserRole.resident)
     
-    # Team Relationship
-    team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)
-    is_approved = Column(Boolean, default=False) # True if request accepted by senior
-    team = relationship("Team", back_populates="users")
+    # Service Relationship (replaces team_id)
+    service_id = Column(Integer, ForeignKey("services.id"), nullable=True)
+    is_approved = Column(Boolean, default=False)  # True if request accepted by senior
+    is_service_admin = Column(Boolean, default=False)  # True for chef de service
+    service = relationship("Service", back_populates="users", foreign_keys=[service_id])
 
     # Profile fields (for residents)
     semester = Column(Integer, nullable=True)  # 1-10 (current semester number)
@@ -189,11 +207,11 @@ class Category(Base):
     __tablename__ = "categories"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(255), unique=False, nullable=False) # Unique constraint removed (handled by logic/composite)
+    name = Column(String(255), unique=False, nullable=False)
     
-    # Team specificity (Null = Global)
-    team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)
-    team = relationship("Team")
+    # Service specificity (Null = Global)
+    service_id = Column(Integer, ForeignKey("services.id"), nullable=True)
+    service = relationship("Service")
 
     # Section grouping for UI (intervention, gesture, complication)
     # Default is "intervention" for backwards compatibility
@@ -217,18 +235,15 @@ class Procedure(Base):
     name = Column(String(255), nullable=False)
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=False)
 
-    # Team specificity (Null = Global, or inherits from Category)
-    team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)
-    team = relationship("Team")
+    # Service specificity (Null = Global, or inherits from Category)
+    service_id = Column(Integer, ForeignKey("services.id"), nullable=True)
+    service = relationship("Service")
 
     # DESAR competency domain tagging (optional — set by senior)
     competency_id = Column(Integer, ForeignKey("competencies.id"), nullable=True)
     competency = relationship("Competency")
 
     # LC-CUSUM thresholds (per-procedure, literature-based)
-    # p0 = unacceptable failure rate (null hypothesis in Wald test)
-    # p1 = acceptable failure rate (alternative hypothesis)
-    # Convention: p0 = 2 * p1 (literature standard)
     lc_cusum_p0 = Column(Float, nullable=True)  # e.g. 0.20
     lc_cusum_p1 = Column(Float, nullable=True)  # e.g. 0.10
 
@@ -251,12 +266,12 @@ class ProcedureLog(Base):
     procedure_id = Column(Integer, ForeignKey("procedures.id"), nullable=False)
     date = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     autonomy_level = Column(String(50), nullable=True)  # Stores AutonomyLevel or ComplicationRole value
-    case_id = Column(String(36), nullable=True, index=True) # Grouping ID for multi-procedure cases
+    case_id = Column(String(36), nullable=True, index=True)  # Grouping ID for multi-procedure cases
     case_type = Column(SAEnum(CaseType), default=CaseType.intervention, nullable=False)
     notes = Column(Text, nullable=True)
     is_success = Column(Boolean, nullable=True)  # Senior-validated objective success
     surgery_type = Column(String(100), nullable=True)  # Type of surgery (maps to F.a-F.j)
-    semester_id = Column(Integer, ForeignKey("semesters.id"), nullable=True)  # Which semester this log belongs to
+    semester_id = Column(Integer, ForeignKey("semesters.id"), nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
@@ -270,21 +285,23 @@ class ProcedureLog(Base):
 
 class Invitation(Base):
     """
-    Tracks pending email invitations to join a team.
+    Tracks pending email invitations to join a service.
     """
     __tablename__ = "invitations"
 
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(255), nullable=False, index=True)
-    team_id = Column(Integer, ForeignKey("teams.id"), nullable=False)
+    service_id = Column(Integer, ForeignKey("services.id"), nullable=False)
+    role = Column(String(50), nullable=True)  # "senior" or "resident" — target role for the invitee
+    invited_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     status = Column(SAEnum(InvitationStatus), default=InvitationStatus.pending)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
-    team = relationship("Team")
+    service = relationship("Service")
 
     def __repr__(self):
-        return f"<Invitation {self.email} -> {self.team_id} ({self.status.value})>"
+        return f"<Invitation {self.email} -> {self.service_id} ({self.status.value})>"
 
 
 class ProcedureCompetence(Base):
@@ -304,9 +321,9 @@ class ProcedureCompetence(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     procedure_id = Column(Integer, ForeignKey("procedures.id"), nullable=False)
     is_mastered = Column(Boolean, default=False, nullable=False)
-    mastered_at_log_count = Column(Integer, nullable=True)  # How many logs before mastery
+    mastered_at_log_count = Column(Integer, nullable=True)
     mastered_date = Column(DateTime, nullable=True)
-    is_pre_acquired = Column(Boolean, default=False)  # Senior manually marked as pre-acquired
+    is_pre_acquired = Column(Boolean, default=False)
     senior_validated = Column(Boolean, default=False, nullable=False)
     senior_validated_date = Column(DateTime, nullable=True)
     senior_validated_by = Column(Integer, ForeignKey("users.id"), nullable=True)
@@ -318,21 +335,21 @@ class ProcedureCompetence(Base):
     validator = relationship("User", foreign_keys=[senior_validated_by])
 
 
-class TeamProcedureThreshold(Base):
+class ServiceProcedureThreshold(Base):
     """
-    Configurable competence threshold per procedure per team.
+    Configurable competence threshold per procedure per service.
     The senior defines the expected number of procedures before autonomy.
     """
-    __tablename__ = "team_procedure_thresholds"
+    __tablename__ = "service_procedure_thresholds"
 
     id = Column(Integer, primary_key=True, index=True)
-    team_id = Column(Integer, ForeignKey("teams.id"), nullable=False)
+    service_id = Column(Integer, ForeignKey("services.id"), nullable=False)
     procedure_id = Column(Integer, ForeignKey("procedures.id"), nullable=False)
     min_procedures = Column(Integer, nullable=False, default=5)
     max_procedures = Column(Integer, nullable=False, default=15)
 
     # Relationships
-    team = relationship("Team")
+    service = relationship("Service")
     procedure = relationship("Procedure")
 
 
@@ -355,16 +372,16 @@ class Semester(Base):
     start_date = Column(Date, nullable=True)  # Null = not yet configured
     end_date = Column(Date, nullable=True)  # Auto = start_date + 6 months
     subdivision = Column(String(100), nullable=True)  # Région / subdivision (ex: Île-de-France)
-    hospital = Column(String(255), nullable=True)  # Établissement
-    service = Column(String(255), nullable=True)  # Service / département
+    hospital = Column(String(255), nullable=True)  # Établissement (legacy free text)
+    service_name = Column(String(255), nullable=True)  # Service / département (legacy free text)
     chef_de_service = Column(String(255), nullable=True)  # Chef(fe) de service
-    team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)  # Team during this semester
+    service_id = Column(Integer, ForeignKey("services.id"), nullable=True)  # Link to Service entity
     is_current = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
     user = relationship("User", back_populates="semesters")
-    team = relationship("Team")
+    service = relationship("Service")
 
     @staticmethod
     def phase_for_semester(number: int) -> DesarPhase:
@@ -389,7 +406,7 @@ class GuardLog(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     date = Column(Date, nullable=False)
-    guard_type = Column(SAEnum(GuardType), nullable=False, default=GuardType.garde_24h)
+    guard_type = Column(SAEnum(GuardType), nullable=False, default=GuardType.garde)
     semester_id = Column(Integer, ForeignKey("semesters.id"), nullable=True)
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))

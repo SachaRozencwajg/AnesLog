@@ -26,12 +26,12 @@
             {% endif %}
 
             <form method="post" action="/inscription" class="space-y-4"
-                x-data="{ role: 'resident', teamId: '{{ preselected_team_id if preselected_team_id else '' }}' }">
+                x-data="{ role: 'resident', serviceId: '{{ preselected_service_id if preselected_service_id else '' }}' }">
 
                 {% if invitation_token %}
                 <input type="hidden" name="invitation_token" value="{{ invitation_token }}">
                 <input type="hidden" name="role" value="resident">
-                <input type="hidden" name="team_id" value="{{ preselected_team_id }}">
+                <input type="hidden" name="service_id" value="{{ preselected_service_id }}">
 
                 <div
                     class="mb-6 p-4 bg-primary-50 text-primary-900 text-sm rounded-xl border border-primary-100 shadow-sm">
@@ -42,7 +42,7 @@
                         </svg>
                         Invitation acceptée !
                     </p>
-                    <p class="text-primary-800">Vous rejoignez l'équipe avec l'email <strong class="font-semibold">{{
+                    <p class="text-primary-800">Vous rejoignez le service avec l'email <strong class="font-semibold">{{
                             preselected_email }}</strong>.</p>
                     <p class="text-primary-800 mt-2">Veuillez définir votre mot de passe pour finaliser l'inscription.
                     </p>
@@ -102,27 +102,28 @@
                     </div>
                 </div>
 
-                <!-- Team Selection -->
+                <!-- Service Selection -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-600 mb-1">Équipe</label>
-                    <select name="team_id" x-model="teamId" required
+                    <label class="block text-sm font-medium text-gray-600 mb-1">Service</label>
+                    <select name="service_id" x-model="serviceId" required
                         class="w-full px-4 py-3 rounded-xl border border-surface-300 bg-surface-50 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-transparent transition text-sm">
-                        <option value="">— Choisir une équipe —</option>
-                        {% for team in teams %}
-                        <option value="{{ team.id }}">{{ team.name }}</option>
+                        <option value="">— Choisir un service —</option>
+                        {% for service in services %}
+                        <option value="{{ service.id }}">{{ service.name }}{% if service.hospital %} — {{
+                            service.hospital }}{% endif %}</option>
                         {% endfor %}
-                        <option value="NEW">+ Créer une nouvelle équipe</option>
+                        <option value="NEW">+ Créer un nouveau service</option>
                     </select>
                 </div>
 
-                <!-- New Team Name -->
-                <div x-show="teamId === 'NEW'" x-cloak class="transition-all duration-300 ease-in-out">
-                    <label class="block text-sm font-medium text-gray-600 mb-1">Nom de la nouvelle équipe</label>
-                    <input type="text" name="new_team_name" placeholder="Ex: Hôpital Bichat - Anesthésie"
+                <!-- New Service Name -->
+                <div x-show="serviceId === 'NEW'" x-cloak class="transition-all duration-300 ease-in-out">
+                    <label class="block text-sm font-medium text-gray-600 mb-1">Nom du nouveau service</label>
+                    <input type="text" name="new_service_name" placeholder="Ex: Anesthésie"
                         class="w-full px-4 py-3 rounded-xl border border-surface-300 bg-surface-50 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-transparent transition text-sm">
                     <p x-show="role !== 'senior'"
                         class="text-xs text-amber-600 mt-2 bg-amber-50 p-2 rounded-lg border border-amber-100">
-                        ⚠️ Seuls les Seniors peuvent créer une équipe. Veuillez sélectionner une équipe existante.
+                        ⚠️ Seuls les Seniors peuvent créer un service. Veuillez sélectionner un service existant.
                     </p>
                 </div>
                 {% endif %}

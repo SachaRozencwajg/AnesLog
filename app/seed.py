@@ -5,18 +5,19 @@ Run with:  python -m app.seed
 ===========================================================================
 HOW TO ADD NEW PROCEDURES:
 Just add entries to the SEED_DATA dictionary below.
-The key is the category name (French), the value is a list of procedure names.
+The script will automatically create missing categories and procedures.
 ===========================================================================
 """
 import random
-import sys
 import uuid
-from datetime import datetime, timedelta, timezone, date
-from app.database import engine, SessionLocal, Base
+from datetime import date, datetime, timedelta, timezone
+
+from app.database import SessionLocal, engine, Base
 from app.models import (
-    User, Category, Procedure, ProcedureLog, UserRole, Team, AutonomyLevel,
-    ComplicationRole, CompetencyDomain, Competency, DesarPhase, Semester,
-    GuardLog, GuardType, ProcedureCompetence, CaseType,
+    User, Category, Procedure, ProcedureLog, AutonomyLevel,
+    ComplicationRole, UserRole, Semester, Service,
+    CompetencyDomain, Competency, ProcedureCompetence,
+    GuardLog, GuardType, DesarPhase, CaseType,
 )
 from app.auth import hash_password
 
@@ -27,20 +28,20 @@ COMPETENCY_DOMAINS = [
     {"code": "A", "name": "Évaluation pré-opératoire",
      "description": "Examen pré-op, classification de risque, allergie, jeûne, prémédication",
      "phase_required": DesarPhase.socle, "display_order": 1},
-    {"code": "B", "name": "Anesthésie générale",
-     "description": "Check-list, voies aériennes, monitorage, induction, ventilation, hypothermie",
+    {"code": "B", "name": "Conduire une anesthésie générale",
+     "description": "Induction, gestion de l'AG et des voies aériennes, agents intraveineux et halogénés",
      "phase_required": DesarPhase.socle, "display_order": 2},
-    {"code": "C", "name": "Réveil et SSPI",
-     "description": "SSPI, NVPO, complications post-opératoires immédiates",
+    {"code": "C", "name": "Réveil de l'anesthésie",
+     "description": "Surveillance, incidents-accidents, score d'Aldrete, NVPO",
      "phase_required": DesarPhase.socle, "display_order": 3},
-    {"code": "D", "name": "Anesthésie locorégionale",
-     "description": "Pharmacologie AL, rachianesthésie, péridurale, blocs périphériques",
+    {"code": "D", "name": "Anesthésie loco-régionale",
+     "description": "Rachianesthésie, péridurales, blocs périphériques écho-guidés",
      "phase_required": DesarPhase.socle, "display_order": 4},
-    {"code": "E", "name": "Douleur péri-opératoire",
-     "description": "Morphiniques, analgésie multimodale, douleur chronique",
-     "phase_required": DesarPhase.approfondissement, "display_order": 5},
-    {"code": "F", "name": "Terrain & chirurgie spécialisée",
-     "description": "F.a Respiratoire, F.b Cardiovasculaire, F.c Neuro, F.d Métabolisme, F.e Hémostase, F.f Obstétrique, F.g Pédiatrie, F.h Céphalique, F.i Dig/uro/ortho, F.j Hors bloc",
+    {"code": "E", "name": "Gestion de la douleur",
+     "description": "Morphiniques, antalgiques non morphiniques, PCA, ALR pour l'analgésie post-opératoire",
+     "phase_required": DesarPhase.socle, "display_order": 5},
+    {"code": "F", "name": "Terrain et type de chirurgie",
+     "description": "Adapter la stratégie au terrain (respiratoire, cardiovasculaire, neuro, obstétrique, pédiatrie…)",
      "phase_required": DesarPhase.approfondissement, "display_order": 6},
     {"code": "G", "name": "Échographie",
      "description": "ETT, écho pleuropulmonaire, abdominale, vasculaire, doppler transcrânien, ALR écho-guidée",
@@ -55,27 +56,20 @@ COMPETENCY_DOMAINS = [
 # ---------------------------------------------------------------------------
 COMPETENCIES = {
     # ── Domain A ─────────────────────────────────────────────────────
-    # Évaluer le risque opératoire, présenter une prémédication,
-    # préparer le patient à l'opération et l'informer
+    # Évaluer l'état du patient et préparer l'acte opératoire
     "A": [
-        {"name": "Examen pré-opératoire", "description": "Évaluation complète du patient avant intervention"},
-        {"name": "Classification de risque opératoire", "description": "ASA, scores de risque (Lee, Apfel)"},
-        {"name": "Risque allergique", "description": "Dépistage, bilan allergologique, prévention"},
-        {"name": "Examens complémentaires et gestion péri-opératoire des médicaments", "description": "Stratégie anesthésique, gestion des anticoagulants"},
-        {"name": "Règles du jeûne préopératoire", "description": "Adulte et enfant, prémédication"},
+        {"name": "Examen pré-opératoire", "description": "Consultation d'anesthésie, checklists, classification ASA"},
+        {"name": "Gestion des voies aériennes (évaluation)", "description": "Évaluation prédictive de l'intubation difficile"},
+        {"name": "Jeûne et prémédication", "description": "Règles de jeûne, anxiolyse, protocoles institutionnels"},
     ],
     # ── Domain B ─────────────────────────────────────────────────────
     # Conduire une anesthésie générale
     "B": [
         {"name": "Vérifications et procédures de contrôle", "description": "Check-list avant acte interventionnel sous anesthésie"},
-        {"name": "Contrôle des voies aériennes", "description": "IOT, intubation difficile, masque laryngé, algorithme ID"},
-        {"name": "Appareils d'anesthésie", "description": "Vérification, principes de fonctionnement, modes de ventilation, panne"},
-        {"name": "Posture et installation du patient", "description": "Surveillance, complications positionnelles"},
-        {"name": "Surveillance d'une anesthésie", "description": "Profondeur de l'anesthésie, BIS, signes cliniques"},
-        {"name": "Monitorage de base en anesthésie", "description": "SpO2, capnométrie, ECG, PA"},
-        {"name": "Différents types d'induction", "description": "En urgence, en l'absence de voie veineuse, inhalatoire"},
-        {"name": "Besoins liquidiens per-opératoires", "description": "Remplissage, solutés, objectifs hémodynamiques"},
-        {"name": "Hypothermie", "description": "Prévention, moyens de réchauffement, conséquences"},
+        {"name": "Induction et gestion de l'AG", "description": "Hypnotiques, morphiniques, curares, entretien de l'anesthésie"},
+        {"name": "Gestion des voies aériennes (pratique)", "description": "Intubation, masque laryngé, ventilation, intubation difficile"},
+        {"name": "Monitorage peropératoire", "description": "Scope, PNI, SpO2, capnographie, monitorage invasif"},
+        {"name": "Remplissage et transfusion", "description": "Solutés, produits sanguins, récupérateur péri-opératoire"},
     ],
     # ── Domain C ─────────────────────────────────────────────────────
     # Conduire le réveil de l'anesthésie
@@ -84,76 +78,64 @@ COMPETENCIES = {
         {"name": "Nausées et vomissements post-opératoires", "description": "Prévention et traitement des NVPO"},
     ],
     # ── Domain D ─────────────────────────────────────────────────────
-    # Pratiquer une anesthésie loco-régionale
     "D": [
-        {"name": "Pharmacologie des anesthésiques locaux", "description": "Toxicité des AL, doses maximales, intralipides"},
-        {"name": "Techniques d'ALR", "description": "Rachidienne, péridurale, caudale, blocs périphériques"},
-        {"name": "Gestion des complications de l'ALR", "description": "Rachianesthésie totale, toxicité systémique, hématome"},
+        {"name": "Rachianesthésie", "description": "Indications, technique, complications"},
+        {"name": "Anesthésie péridurale", "description": "Lombaire et thoracique, indications spécifiques"},
+        {"name": "Blocs périphériques écho-guidés", "description": "Adducteurs, fémoraux, sciatiques, TAP, PECS"},
     ],
     # ── Domain E ─────────────────────────────────────────────────────
     # Gérer la douleur pendant et dans les suites d'une opération
     "E": [
         {"name": "Morphiniques et antagonistes", "description": "Utilisation et prescription, PCA"},
         {"name": "Antalgiques non morphiniques", "description": "Paracétamol, AINS, néfopam, kétamine"},
-        {"name": "Anti-hyperalgésiques", "description": "Prévention de l'hyperalgésie, kétamine, gabapentinoïdes"},
-        {"name": "Évaluation de la douleur", "description": "Échelles, douleur post-opératoire, physiopathologie"},
-        {"name": "Monitorage de l'analgésie", "description": "ANI, pupillométrie, indices nociceptifs"},
-        {"name": "Douleur chronique", "description": "Chronification, prise en charge multidisciplinaire"},
+        {"name": "Techniques d'ALR pour l'analgésie", "description": "Cathéters périnerveux, péridurales analgésiques"},
     ],
     # ── Domain F ─────────────────────────────────────────────────────
     # Tenir compte des répercussions de l'anesthésie sur les grandes
     # fonctions ; adapter la stratégie au terrain et au type de chirurgie
     "F": [
         {"name": "F.a — Fonction respiratoire", "description": "Insuffisant respiratoire, asthme, chirurgie thoracique, thoracoscopie, œsophage"},
-        {"name": "F.b — Fonction cardiovasculaire", "description": "Coronarien, troubles du rythme, IC, HTA, chirurgie cardiaque et vasculaire"},
-        {"name": "F.c — Neuro-anesthésie", "description": "PIC, traumatisme crânien, tumeur intracrânienne, mort encéphalique"},
-        {"name": "F.d — Rein et anesthésie", "description": "Fonction rénale, EER, transplantation rénale, chirurgie urologique"},
-        {"name": "F.e — Hémostase et anesthésie", "description": "Troubles de l'hémostase, transfusion, épargne sanguine"},
-        {"name": "F.f — Obstétrique", "description": "Césarienne, ALR obstétricale, toxémie, hémorragie de la délivrance"},
-        {"name": "F.g — Pédiatrie", "description": "Voies aériennes, apports hydro-électrolytiques, urgences digestives, ALR pédiatrique"},
-        {"name": "F.h — Chirurgie céphalique", "description": "ORL, ophtalmologie, maxillo-faciale, laser, endoscopies"},
-        {"name": "F.i — Chirurgie digestive/uro/ortho", "description": "Hanche, genou, lambeaux, occlusions, chirurgie hépatique, prostate"},
+        {"name": "F.b — Fonction cardiovasculaire", "description": "Coronarien, valvulopathie, chirurgie cardiaque, CEC, pontages"},
+        {"name": "F.c — Fonction neurologique", "description": "Neurochirurgie, rachis, HTIC, épilepsie"},
+        {"name": "F.d — Obstétrique", "description": "Césarienne, analgésie du travail, éclampsie, hémorragie du post-partum"},
+        {"name": "F.e — Pédiatrie", "description": "Nouveau-né, nourrisson, enfant, particularités pharmacologiques"},
+        {"name": "F.f — Ambulatoire", "description": "Critères d'éligibilité, prise en charge, réhabilitation rapide"},
+        {"name": "F.g — Urgence", "description": "Estomac plein, induction séquence rapide, polytraumatisé"},
+        {"name": "F.h — Obésité et terrain particulier", "description": "SAOS, insuffisant hépatique ou rénal"},
+        {"name": "F.i — ORL/Ophta/Stomatologie", "description": "Intubation nasale, jet ventilation, laser, saignement ORL"},
         {"name": "F.j — Hors bloc opératoire", "description": "Endoscopies digestives, radiologie interventionnelle, neuroradiologie"},
     ],
     # ── Domain G ─────────────────────────────────────────────────────
     # Utiliser les ultrasons en anesthésie-réanimation
     "G": [
-        {"name": "Échocardiographie cardiaque", "description": "Fonction contractile, épanchement péricardique, conditions de charge"},
-        {"name": "Échographie pleuro-pulmonaire", "description": "Épanchement pleural, qualité et quantité"},
-        {"name": "Échographie abdominale", "description": "Épanchement liquidien, globe vésical"},
-        {"name": "Échographie vasculaire", "description": "Reconnaissance des vaisseaux, guidage de ponction"},
+        {"name": "Échographie cardiaque (ETT/ETO)", "description": "Coupes de base, évaluation cinétique, remplissage"},
+        {"name": "Échographie pleuropulmonaire", "description": "Pneumothorax, épanchement, profil BLUE"},
     ],
     # ── CoBaTrICE (Réanimation) ──────────────────────────────────────
     # Compétences communes avec le MIR (Journal Officiel 28 avril 2017)
     "COBA": [
         {"name": "Approche structurée du patient grave", "description": "Identification, évaluation et traitement des défaillances viscérales"},
-        {"name": "Monitorage et examens complémentaires", "description": "Évaluer, monitorer, prescrire et interpréter les données"},
-        {"name": "Défaillance rénale", "description": "Identification et prise en charge"},
-        {"name": "Défaillance neurologique", "description": "Identification et prise en charge"},
-        {"name": "Défaillance cardiocirculatoire", "description": "État de choc, catécholamines, monitorage"},
-        {"name": "Défaillance pulmonaire", "description": "SDRA, ventilation protectrice"},
-        {"name": "Défaillance hépato-digestive", "description": "Insuffisance hépatique, hémorragie digestive"},
-        {"name": "Défaillance hématologique", "description": "CIVD, thrombopénie, transfusion"},
-        {"name": "Sepsis et antibiothérapie", "description": "Identification, Surviving Sepsis Campaign"},
-        {"name": "Intoxications", "description": "Médicamenteuses et toxines environnementales"},
+        {"name": "Réanimation cardiorespiratoire", "description": "Arrêt cardiaque : diagnostic, prise en charge, protocoles ALS"},
+        {"name": "Ventilation artificielle", "description": "Indications, modes ventilatoires, sevrage, VNI"},
+        {"name": "Sédation et analgésie en réanimation", "description": "Échelles de sédation, protocoles, curarisation"},
+        {"name": "États de choc", "description": "Choc septique, hémorragique, cardiogénique, obstructif"},
+        {"name": "IRA et EER", "description": "Diagnostic, indications de l'épuration, modalités"},
+        {"name": "Défaillance hépatique aiguë", "description": "Encéphalopathie hépatique, transplantation hépatique"},
+        {"name": "Troubles de l'hémostase", "description": "CIVD, thrombopénie, anti-agrégants, AVK, AOD"},
+        {"name": "Infectiologie en réanimation", "description": "Pneumonies acquises sous ventilation, bactériémies, C. difficile"},
+        {"name": "Neuro-réanimation", "description": "Traumatisme crânien, AVC, état de mal, mort encéphalique"},
         {"name": "Complications du péripartum", "description": "Mise en danger de la vie de la mère"},
         {"name": "Antibiothérapie en réanimation", "description": "Spécificités, pharmacocinétique"},
         {"name": "Produits sanguins labiles", "description": "Administration en toute sécurité"},
         {"name": "Remplissage et vasopresseurs", "description": "Solutés, médicaments vasomoteurs et inotropes"},
-        {"name": "Assistance circulatoire mécanique", "description": "ECMO, contre-pulsion, Impella"},
-        {"name": "Ventilation invasive", "description": "Intubation, réglages ventilatoires, sevrage"},
-        {"name": "Ventilation non invasive", "description": "VNI, OHD, CPAP"},
-        {"name": "Épuration extra-rénale", "description": "Hémodialyse, hémofiltration continue, sevrage"},
-        {"name": "Troubles hydro-électrolytiques", "description": "Glucose, équilibre acido-basique"},
-        {"name": "Nutrition en réanimation", "description": "Évaluation et mise en œuvre"},
-        {"name": "Patient chirurgical à haut risque", "description": "Soins péri-opératoires, chirurgie cardiaque et neurochirurgie"},
-        {"name": "Transplantation d'organes", "description": "Soins du patient transplanté"},
+        {"name": "Évaluation hémodynamique invasive", "description": "Cathéters artériels, PiCCO, Swan-Ganz, échocardiographie"},
+        {"name": "Nutrition en réanimation", "description": "Entérale et parentérale, protocoles, surveillance"},
+        {"name": "Gestion des accès vasculaires", "description": "CVC, dialyse, PICC, complications"},
+        {"name": "Brûlé", "description": "Réanimation initiale, surface, besoins en remplissage"},
         {"name": "Patient traumatisé", "description": "Soins pré et postopératoires"},
         {"name": "Conséquences physiques et psychologiques", "description": "Minimiser l'impact sur patients et familles"},
         {"name": "Soins de fin de vie et limitation thérapeutique", "description": "Éthique, entretien avec familles, collaboration multidisciplinaire"},
-        {"name": "Arrêt cardiaque récent", "description": "Gestion et réanimation cardio-pulmonaire"},
-        {"name": "Urgences vitales et procédures de secours", "description": "Prise en charge immédiate"},
-        {"name": "Sédation et analgésie en réanimation", "description": "Évaluation, prévention du délire, curarisation"},
+        {"name": "Communication et gestion d'équipe", "description": "Leadership, relève, annonce d'une mauvaise nouvelle"},
         {"name": "Transport du patient critique", "description": "Transport sécurisé en dehors de l'unité"},
         {"name": "Gestion d'afflux de victimes", "description": "Accidents à nombreuses victimes, plan blanc"},
     ],
@@ -310,80 +292,31 @@ SEED_DATA: dict[str, list[str]] = {
 
 # ---------------------------------------------------------------------------
 # LC-CUSUM thresholds per gesture (literature-based)
-# p0 = unacceptable failure rate (null hypothesis in Wald test)
-# p1 = acceptable failure rate (alternative hypothesis)
-# Convention: p0 = 2 × p1 (standard in the literature)
-# Sources: Konrad et al. Anesth Analg 2003, Frontiers in Medicine (US-CEB),
-#          NIH meta-analyses on PNB, DLT, CVC, arterial line success rates
 # ---------------------------------------------------------------------------
 LC_CUSUM_THRESHOLDS: dict[str, tuple[float, float]] = {
-    # Simple / intermediate gestures: p0=0.20, p1=0.10
     "KTA (Cathéter artériel)": (0.20, 0.10),
     "KTC (Cathéter veineux central)": (0.20, 0.10),
-    "Péridurale thoracique": (0.20, 0.10),           # Konrad: 10% acceptable
+    "Péridurale thoracique": (0.20, 0.10),
     "ALR para-sternale": (0.20, 0.10),
     "ALR périphérique (TAP block)": (0.20, 0.10),
     "ALR périphérique (Sciatique poplité)": (0.20, 0.10),
     "ALR périphérique (Fémoral)": (0.20, 0.10),
-    # Complex gestures: p0=0.30, p1=0.15
     "Swan-Ganz (Cathéter artériel pulmonaire)": (0.30, 0.15),
-    "Intubation double lumière": (0.30, 0.15),       # DLT malpositioning 33-50%
+    "Intubation double lumière": (0.30, 0.15),
     "Bloqueur bronchique": (0.30, 0.15),
-    "ETO peropératoire": (0.30, 0.15),               # Complex imaging
+    "ETO peropératoire": (0.30, 0.15),
 }
 
-# Demo users — each resident at a specific DESAR semester for comprehensive testing
+# Minimal demo users — just 1 resident + 1 senior
 DEMO_USERS = [
-    # ─── Residents at different DESAR phases ───
     {
         "email": "resident@aneslog.fr",
         "password": "resident123",
         "full_name": "Marie Dupont",
         "role": UserRole.resident,
-        "semester": 2,           # Socle, early
-        "cases_target": 5,
+        "semester": 4,
+        "cases_target": 15,
     },
-    {
-        "email": "celine.kuoch@aneslog.fr",
-        "password": "resident123",
-        "full_name": "Céline KUOCH",
-        "role": UserRole.resident,
-        "semester": 4,           # Approfondissement, early
-        "cases_target": 5,
-    },
-    {
-        "email": "maxime.aparicio@aneslog.fr",
-        "password": "resident123",
-        "full_name": "Maxime APARICIO",
-        "role": UserRole.resident,
-        "semester": 6,           # Approfondissement, mid
-        "cases_target": 5,
-    },
-    {
-        "email": "julien.pozzatti@aneslog.fr",
-        "password": "resident123",
-        "full_name": "Julien POZZATTI",
-        "role": UserRole.resident,
-        "semester": 8,           # Approfondissement, late
-        "cases_target": 5,
-    },
-    {
-        "email": "roberta@aneslog.fr",
-        "password": "resident123",
-        "full_name": "Roberta DA SILVA",
-        "role": UserRole.resident,
-        "semester": 9,           # Consolidation
-        "cases_target": 5,
-    },
-    {
-        "email": "andrei.mitre@aneslog.fr",
-        "password": "resident123",
-        "full_name": "Andrei MITRE",
-        "role": UserRole.resident,
-        "semester": 10,          # Consolidation, final year
-        "cases_target": 5,
-    },
-    # ─── Senior ───
     {
         "email": "senior@aneslog.fr",
         "password": "senior123",
@@ -394,16 +327,10 @@ DEMO_USERS = [
 
 
 def seed_competency_domains(db):
-    """Seed the 7+1 DESAR competency domains and their competencies.
-    
-    On each run the competency list is reconciled with the reference
-    COMPETENCIES dict: new items are added and stale items (names that
-    no longer appear in the reference) are removed so the DB always
-    matches the official maquette.
-    """
+    """Seed the 7+1 DESAR competency domains and their competencies."""
     print("\n📚 Seeding DESAR competency domains...")
     
-    domain_map = {}  # code → CompetencyDomain object
+    domain_map = {}
     
     for domain_data in COMPETENCY_DOMAINS:
         existing = db.query(CompetencyDomain).filter(
@@ -421,17 +348,15 @@ def seed_competency_domains(db):
     
     # Seed competencies within each domain
     print("\n📋 Syncing competencies with official maquette...")
-    competency_map = {}  # (domain_code, name) → Competency
+    competency_map = {}
     
     for domain_code, competencies in COMPETENCIES.items():
         domain = domain_map.get(domain_code)
         if not domain:
             continue
 
-        # Build set of reference names for this domain
         reference_names = {c["name"] for c in competencies}
 
-        # Remove stale competencies (names no longer in the maquette)
         existing_comps = db.query(Competency).filter(
             Competency.domain_id == domain.id,
         ).all()
@@ -440,7 +365,6 @@ def seed_competency_domains(db):
                 db.delete(ec)
                 print(f"    − Supprimé: {domain_code}.{ec.name}")
 
-        # Upsert current competencies
         for i, comp_data in enumerate(competencies, 1):
             existing = db.query(Competency).filter(
                 Competency.domain_id == domain.id,
@@ -458,7 +382,6 @@ def seed_competency_domains(db):
                 competency_map[(domain_code, comp.name)] = comp
                 print(f"    + {domain_code}.{comp.name}")
             else:
-                # Update display_order and description if changed
                 existing.display_order = i
                 existing.description = comp_data.get("description", existing.description)
                 competency_map[(domain_code, existing.name)] = existing
@@ -475,7 +398,6 @@ def link_procedures_to_competencies(db, domain_map):
         proc = db.query(Procedure).filter(Procedure.name == proc_name).first()
         domain = domain_map.get(domain_code)
         if proc and domain and not proc.competency_id:
-            # Find the first competency in this domain to link to
             first_comp = db.query(Competency).filter(
                 Competency.domain_id == domain.id
             ).order_by(Competency.display_order).first()
@@ -486,30 +408,22 @@ def link_procedures_to_competencies(db, domain_map):
     db.commit()
 
 
-def seed_semesters(db, team):
-    """Create realistic semester history for each resident at their specific DESAR stage."""
+def seed_semesters(db, service):
+    """Create realistic semester history for the demo resident."""
     print("\n📅 Seeding demo semesters...")
     
-    # Diverse hospital rotation — realistic Île-de-France training
-    # (hospital, service, chef_de_service)
     HOSPITAL_ROTATIONS = [
         ("Hôpital Marie Lannelongue", "Anesthésie-Réanimation Cardiovasculaire", "Pr. Olaf Mercier"),
         ("Hôpital Bicêtre", "Réanimation Chirurgicale", "Pr. Jacques Martin"),
         ("Hôpital Necker", "Anesthésie Pédiatrique", "Pr. Isabelle Constant"),
         ("Hôpital Cochin", "Anesthésie Obstétricale", "Pr. Anne Bhogal"),
-        ("CHU Kremlin-Bicêtre", "Réanimation Médicale", "Pr. David Osman"),
-        ("Hôpital Tenon", "Chirurgie Digestive", "Pr. Frédéric Aubrun"),
-        ("Hôpital Lariboisière", "Neuro-Anesthésie", "Pr. Sébastien Pili-Floury"),
-        ("Hôpital Saint-Louis", "Réanimation Polyvalente", "Pr. Benoît Plaud"),
-        ("Hôpital Foch", "Chirurgie Thoracique", "Pr. Marc Fischler"),
-        ("Hôpital Européen Georges Pompidou", "Chirurgie Vasculaire", "Pr. Bernard Cholley"),
     ]
     
     residents_data = {ud["email"]: ud for ud in DEMO_USERS if ud["role"] == UserRole.resident}
     
     residents = db.query(User).filter(
         User.role == UserRole.resident,
-        User.team_id == team.id,
+        User.service_id == service.id,
     ).all()
     
     for user in residents:
@@ -520,7 +434,6 @@ def seed_semesters(db, team):
         user_info = residents_data.get(user.email, {})
         current_sem = user_info.get("semester", 2)
         
-        # Compute a realistic start date for S1 based on how many semesters completed
         from dateutil.relativedelta import relativedelta
         months_back = (current_sem - 1) * 6
         s1_start = date.today() - timedelta(days=months_back * 30)
@@ -530,21 +443,19 @@ def seed_semesters(db, team):
         shuffled_hospitals = list(HOSPITAL_ROTATIONS)
         random.shuffle(shuffled_hospitals)
         
-        for s in range(1, 11):  # Always create all 10 blocks
+        for s in range(1, 11):
             phase = Semester.phase_for_semester(s)
             
             if s <= current_sem:
-                # Past & current semesters: fill in dates + hospital
                 sem_start = s1_start + relativedelta(months=6 * (s - 1))
                 sem_end = sem_start + relativedelta(months=6) - timedelta(days=1)
                 hosp, serv, chef = shuffled_hospitals[(s - 1) % len(shuffled_hospitals)]
-                subdiv = "Île-de-France"  # All demo users are in IDF
+                subdiv = "Île-de-France"
                 if s == current_sem:
                     hosp = "Hôpital Marie Lannelongue"
                     serv = "Anesthésie-Réanimation Cardiovasculaire"
                     chef = "Pr. Olaf Mercier"
             else:
-                # Future semesters: empty blocks
                 sem_start = None
                 sem_end = None
                 subdiv = None
@@ -560,9 +471,9 @@ def seed_semesters(db, team):
                 end_date=sem_end,
                 subdivision=subdiv,
                 hospital=hosp,
-                service=serv,
+                service_name=serv,
                 chef_de_service=chef,
-                team_id=team.id,
+                service_id=service.id if s == current_sem else None,
                 is_current=(s == current_sem),
             )
             db.add(sem)
@@ -573,18 +484,14 @@ def seed_semesters(db, team):
 
 
 def seed_guard_logs(db):
-    """Create realistic guard logs — more guards for advanced residents."""
+    """Create realistic guard logs."""
     print("\n🛡️ Seeding demo guard logs...")
     
     guard_notes = [
         "Nuit calme, 2 entrées",
         "Garde chargée — 1 ACR, 3 admissions",
         "Appel réa pour intubation",
-        "Transfert SMUR nuit, polytraumatisé",
-        "Césarienne urgente 3h du matin",
-        "Nuit tranquille, 1 extubation programmée",
-        "2 admissions post-op compliquées",
-        None, None, None,  # Some guards without notes
+        None, None,
     ]
     
     residents = db.query(User).filter(User.role == UserRole.resident).all()
@@ -594,21 +501,17 @@ def seed_guard_logs(db):
         if existing:
             continue
         
-        # More guards for more advanced residents
         sem_number = user.semester or 2
-        num_guards = sem_number * 3 + random.randint(0, 5)  # S2→6-11, S10→30-35
+        num_guards = sem_number * 3 + random.randint(0, 5)
         
-        # Get semesters with dates for this user to distribute guards
         semesters = db.query(Semester).filter(
             Semester.user_id == user.id,
             Semester.start_date.isnot(None),
         ).order_by(Semester.number).all()
         
         for i in range(num_guards):
-            # Distribute guards across semesters
             if semesters:
                 sem = random.choice(semesters)
-                # Random date within semester bounds
                 start = sem.start_date
                 end = sem.end_date or date.today()
                 days_range = max((end - start).days, 1)
@@ -617,9 +520,8 @@ def seed_guard_logs(db):
                 guard_date = date.today() - timedelta(days=random.randint(0, 180))
                 sem = None
             
-            # Weight towards garde_24h (more common)
             guard_type = random.choices(
-                [GuardType.garde_24h, GuardType.astreinte],
+                [GuardType.garde, GuardType.astreinte],
                 weights=[0.7, 0.3],
             )[0]
             
@@ -636,45 +538,27 @@ def seed_guard_logs(db):
     db.commit()
 
 
-# ── Autonomy weighting by semester (realistic progression) ────────────────
-# S1-S2 (Socle): mostly "observed" and "assisted"
-# S3-S5 (Approf early): balanced, moving toward "capable"
-# S6-S8 (Approf late): mostly "capable" + "autonomous"
-# S9-S10 (Consolidation): almost all "autonomous"
+# ── Autonomy weighting by semester ────────────────────────────────────
 AUTONOMY_WEIGHTS = {
-    1:  [0.60, 0.30, 0.08, 0.02],   # S1: 60% observed
-    2:  [0.40, 0.35, 0.18, 0.07],   # S2: shifting to assisted
-    3:  [0.15, 0.40, 0.30, 0.15],   # S3: mostly assisted
-    4:  [0.08, 0.30, 0.40, 0.22],   # S4: moving to capable
-    5:  [0.05, 0.15, 0.45, 0.35],   # S5: mostly capable
-    6:  [0.03, 0.10, 0.37, 0.50],   # S6: half autonomous
-    7:  [0.02, 0.08, 0.25, 0.65],   # S7: majority autonomous
-    8:  [0.01, 0.04, 0.20, 0.75],   # S8: strong autonomous
-    9:  [0.00, 0.02, 0.13, 0.85],   # S9: near-full autonomous
-    10: [0.00, 0.01, 0.09, 0.90],   # S10: final year – autonomous
+    1:  [0.60, 0.30, 0.08, 0.02],
+    2:  [0.40, 0.35, 0.18, 0.07],
+    3:  [0.15, 0.40, 0.30, 0.15],
+    4:  [0.08, 0.30, 0.40, 0.22],
+    5:  [0.05, 0.15, 0.45, 0.35],
+    6:  [0.03, 0.10, 0.37, 0.50],
+    7:  [0.02, 0.08, 0.25, 0.65],
+    8:  [0.01, 0.04, 0.20, 0.75],
+    9:  [0.00, 0.02, 0.13, 0.85],
+    10: [0.00, 0.01, 0.09, 0.90],
 }
 
-# Realistic case notes
 CASE_NOTES = [
     "Patient ASA 2, pas de difficulté particulière",
     "Intubation difficile Cormack 3, VL utilisé",
     "Saignement peropératoire > 1L, transfusion",
-    "Patient obèse, IOT au VL premier passage",
-    "Rachianesthésie en S3, bon bloc sensitif",
-    "Choc hémorragique corrigé par remplissage + NAD",
-    "Ventilation unipulmonaire difficile, SpO2 88% corrigée",
     "CEC sans incident, sevrage inotrope facile",
-    "Extubation sur table, patient stable",
-    "Réinjection péridurale nécessaire à H4",
-    "ETO : bonne cinétique VG post-chirurgie",
-    "1ère césarienne sous rachianesthésie — bonne expérience",
-    "Swan-Ganz posé pour monitoring hémodynamique",
-    "Patient S1 — accompagné par le senior sur la pose de KTA",
-    "Gestion du garrot pneumatique — patient drépanocytaire",
-    "2ème ETO de la semaine — reconnaissance des coupes améliorée",
-    "Cas pédiatrique : enfant 8 ans, IO sévoflurane",
-    "TAVI : anesthésie locale + sédation, patient éveillé",
-    "",  # some cases have no notes
+    "Ventilation unipulmonaire difficile, SpO2 88% corrigée",
+    "",
     "",
     "",
 ]
@@ -685,7 +569,6 @@ def generate_fake_cases(db, user, cases_target):
     sem_number = user.semester or 2
     print(f"    -> Generating {cases_target} cases for {user.full_name} (S{sem_number}): ", end="", flush=True)
     
-    # Pre-fetch procedures by category
     interventions = []
     gestures = []
     complications = []
@@ -711,25 +594,19 @@ def generate_fake_cases(db, user, cases_target):
     autonomy_levels = list(AutonomyLevel)
     weights = AUTONOMY_WEIGHTS.get(sem_number, AUTONOMY_WEIGHTS[5])
     
-    # Get only semesters with dates (past/current) for distributing cases across time
     semesters = db.query(Semester).filter(
         Semester.user_id == user.id,
         Semester.start_date.isnot(None),
     ).order_by(Semester.number).all()
-    
-    semester_map = {s.number: s for s in semesters}
     
     for case_i in range(cases_target):
         if (case_i + 1) % 5 == 0:
             print(f"{case_i+1}", end=" ", flush=True)
         case_uid = str(uuid.uuid4())
         
-        # Distribute cases across semesters (more recent = more cases)
-        # Weight toward later semesters
         if semesters:
             sem_weights = [(i + 1) ** 1.5 for i in range(len(semesters))]
             chosen_sem = random.choices(semesters, weights=sem_weights, k=1)[0]
-            # Random date within this semester
             start = chosen_sem.start_date
             end = chosen_sem.end_date or date.today()
             days_range = max((end - start).days, 1)
@@ -738,7 +615,6 @@ def generate_fake_cases(db, user, cases_target):
                 datetime.min.time(),
                 tzinfo=timezone.utc,
             )
-            # Use the semester's autonomy weights (not the user's current)
             case_weights = AUTONOMY_WEIGHTS.get(chosen_sem.number, weights)
         else:
             days_ago = random.randint(0, 180)
@@ -746,14 +622,12 @@ def generate_fake_cases(db, user, cases_target):
             chosen_sem = None
             case_weights = weights
         
-        # Weighted surgery type — cardiovascular service sees mostly cardiac/thoracic
         surgery_type = random.choices(
             SURGERY_TYPES,
-            weights=[15, 30, 20, 3, 3, 2, 3, 5, 3, 5, 3],  # heavy on cardio/thorac/vasc
+            weights=[15, 30, 20, 3, 3, 2, 3, 5, 3, 5, 3],
             k=1,
         )[0]
         
-        # 1. Main Intervention (Mandatory)
         intervention = random.choice(interventions)
         autonomy = random.choices(autonomy_levels, weights=case_weights, k=1)[0]
         notes = random.choice(CASE_NOTES)
@@ -769,9 +643,8 @@ def generate_fake_cases(db, user, cases_target):
             semester_id=chosen_sem.id if chosen_sem else None,
         ))
         
-        # 2. Gestures (0-3) — more gestures for advanced residents
         if gestures:
-            max_gestures = min(3, 1 + sem_number // 3)  # S1-S3→1-2, S4-S6→2-3, S7+→3
+            max_gestures = min(3, 1 + sem_number // 3)
             num_gestures = random.randint(0, max_gestures)
             if num_gestures > 0:
                 selected_gestures = random.sample(gestures, min(num_gestures, len(gestures)))
@@ -788,14 +661,11 @@ def generate_fake_cases(db, user, cases_target):
                         semester_id=chosen_sem.id if chosen_sem else None,
                     ))
                 
-        # 3. Complications (0-2) — slightly more common for advanced (they handle more)
-        complication_chance = 0.15 + (sem_number * 0.02)  # S2→19%, S10→35%
+        complication_chance = 0.15 + (sem_number * 0.02)
         if complications and random.random() < complication_chance:
              num_comps = random.randint(1, 2)
              selected_comps = random.sample(complications, min(num_comps, len(complications)))
              complication_roles = list(ComplicationRole)
-             # Weights for complications: Observé, Participé, Géré
-             # More experienced → more likely to have managed
              comp_weights = case_weights[:3] if len(case_weights) >= 3 else [0.3, 0.4, 0.3]
              for c in selected_comps:
                  c_autonomy = random.choices(complication_roles, weights=comp_weights, k=1)[0]
@@ -809,35 +679,29 @@ def generate_fake_cases(db, user, cases_target):
                     surgery_type=surgery_type,
                     semester_id=chosen_sem.id if chosen_sem else None,
                  ))
-    print(f"✓")  # Finish the progress line
+    print(f"✓")
 
 
-def seed_procedure_competences(db, team):
-    """Generate ProcedureCompetence records based on actual log data.
-    
-    For each resident and each procedure they've logged:
-      - If autonomous_count >= MASTERY_THRESHOLD → mastered
-      - Some mastered ones get senior_validated (locked)
-    """
+def seed_procedure_competences(db, service):
+    """Generate ProcedureCompetence records based on actual log data."""
     from sqlalchemy import func
     
     THRESHOLD = ProcedureCompetence.MASTERY_THRESHOLD
     
     residents = db.query(User).filter(
         User.role == UserRole.resident,
-        User.team_id == team.id,
+        User.service_id == service.id,
     ).all()
     
     senior = db.query(User).filter(
         User.role == UserRole.senior,
-        User.team_id == team.id,
+        User.service_id == service.id,
     ).first()
     
     if not residents or not senior:
         print("  ⚠ No residents or senior found, skipping competences.")
         return
     
-    # Check if already seeded
     existing = db.query(ProcedureCompetence).count()
     if existing > 0:
         print(f"  ✓ {existing} competences already exist, skipping.")
@@ -847,7 +711,6 @@ def seed_procedure_competences(db, team):
     created = 0
     
     for resident in residents:
-        # Count autonomous logs per procedure
         auto_counts = db.query(
             ProcedureLog.procedure_id,
             func.count(ProcedureLog.id).label("cnt"),
@@ -867,7 +730,6 @@ def seed_procedure_competences(db, team):
         mastered_procs = [(pid, cnt) for pid, cnt in auto_counts if cnt >= THRESHOLD]
         
         for i, (proc_id, auto_cnt) in enumerate(mastered_procs):
-            # ~60% get senior validated (locked)
             is_validated = random.random() < 0.6
             
             comp = ProcedureCompetence(
@@ -933,22 +795,28 @@ def seed():
         # 3. Link procedures to competency domains
         link_procedures_to_competencies(db, domain_map)
 
-        # 4. Seed Team
-        team_name = "Anesth HML"
-        team = db.query(Team).filter(Team.name == team_name).first()
-        if not team:
-            team = Team(name=team_name)
-            db.add(team)
+        # 4. Seed Service (replaces Team)
+        service = db.query(Service).filter(Service.name == "Anesthésie").first()
+        if not service:
+            service = Service(
+                name="Anesthésie",
+                hospital="Hôpital Marie Lannelongue",
+                city="Le Plessis-Robinson",
+                region="Île-de-France",
+                slug="marie-lannelongue-anesthesie",
+            )
+            db.add(service)
             db.commit()
-            print(f"\n  ✓ Équipe: {team_name}")
+            print(f"\n  ✓ Service: {service.display_name}")
         else:
-            print(f"\n  ✓ Équipe existante: {team_name}")
+            print(f"\n  ✓ Service existant: {service.display_name}")
 
         # 5. Seed demo users
         print("\n👤 Seeding demo users...")
         for user_data in DEMO_USERS:
             exists = db.query(User).filter(User.email == user_data["email"]).first()
             if not exists:
+                is_admin = user_data["role"] == UserRole.senior
                 new_user = User(
                     email=user_data["email"],
                     password_hash=hash_password(user_data["password"]),
@@ -956,27 +824,32 @@ def seed():
                     role=user_data["role"],
                     is_active=True,
                     is_approved=True,
-                    team_id=team.id,
+                    service_id=service.id,
+                    is_service_admin=is_admin,
                 )
                 db.add(new_user)
                 db.flush()
-                print(f"  ✓ {user_data['email']} ({user_data['role'].value})")
+                
+                # Update service created_by
+                if is_admin and not service.created_by:
+                    service.created_by = new_user.id
+                    
+                print(f"  ✓ {user_data['email']} ({user_data['role'].value}){' [admin]' if is_admin else ''}")
 
         db.commit()
         
         # 6. Seed semesters for residents
-        seed_semesters(db, team)
+        seed_semesters(db, service)
         
-        # 7. Generate fake cases (must be after semesters)
+        # 7. Generate fake cases
         print("\n📊 Generating fake cases...")
         for user_data in DEMO_USERS:
             if user_data["role"] == UserRole.resident:
                 user = db.query(User).filter(User.email == user_data["email"]).first()
                 if user:
-                    # Only generate if no logs exist
                     log_count = db.query(ProcedureLog).filter(ProcedureLog.user_id == user.id).count()
                     if log_count == 0:
-                        cases_target = user_data.get("cases_target", 50)
+                        cases_target = user_data.get("cases_target", 15)
                         generate_fake_cases(db, user, cases_target)
         
         db.commit()
@@ -985,7 +858,7 @@ def seed():
         seed_guard_logs(db)
         
         # 9. Seed procedure competences
-        seed_procedure_competences(db, team)
+        seed_procedure_competences(db, service)
         
         print("\n✅ Seed completed successfully!")
     except Exception as e:

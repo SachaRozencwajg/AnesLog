@@ -1,5 +1,5 @@
 """
-Senior routes: team overview and resident drill-down.
+Senior routes: service overview and resident drill-down.
 """
 from fastapi import APIRouter, Depends, Request, Form, BackgroundTasks
 from fastapi.responses import RedirectResponse
@@ -31,10 +31,10 @@ def team_overview(
     db: Session = Depends(get_db),
 ):
     """
-    Team overview for seniors: table listing all residents with summary stats.
+    Service overview for seniors: table listing all residents with summary stats.
     Includes group analytics (Means, Totals).
     """
-    if not user.team_id:
+    if not user.service_id:
         return templates.TemplateResponse(
             "team.html",
             {
@@ -42,27 +42,27 @@ def team_overview(
                 "user": user,
                 "resident_stats": [],
                 "pending_residents": [],
-                "error": "Vous n'êtes assigné à aucune équipe."
+                "error": "Vous n'êtes assigné à aucun service."
             },
         )
 
     # Approved residents
     residents = db.query(User).filter(
         User.role == UserRole.resident,
-        User.team_id == user.team_id,
+        User.service_id == user.service_id,
         User.is_approved == True
     ).all()
 
     # Pending residents (signed up but not approved)
     pending_residents = db.query(User).filter(
         User.role == UserRole.resident,
-        User.team_id == user.team_id,
+        User.service_id == user.service_id,
         User.is_approved == False
     ).all()
 
     # Pending Invitations (emailed but not signed up)
     pending_invitations = db.query(Invitation).filter(
-        Invitation.team_id == user.team_id,
+        Invitation.service_id == user.service_id,
         Invitation.status == InvitationStatus.pending
     ).all()
 
@@ -126,7 +126,7 @@ def team_overview(
 
         # Acquisition stats for this resident
         from app.utils.autonomy import compute_acquisition_stats
-        acq = compute_acquisition_stats(db, resident.id, team_id=user.team_id)
+        acq = compute_acquisition_stats(db, resident.id, service_id=user.service_id)
 
         resident_stats.append({
             "user": resident,
@@ -172,7 +172,7 @@ def approve_resident(
     db: Session = Depends(get_db),
 ):
     resident = db.query(User).filter(User.id == resident_id).first()
-    if not resident or resident.team_id != user.team_id:
+    if not resident or resident.service_id != user.service_id:
          # Not found or not in same team
          pass # Error handling simplified
     
@@ -191,7 +191,7 @@ def reject_resident(
     db: Session = Depends(get_db),
 ):
     resident = db.query(User).filter(User.id == resident_id).first()
-    if resident and resident.team_id == user.team_id:
+    if resident and resident.service_id == user.service_id:
         db.delete(resident)
         db.commit()
         
@@ -211,21 +211,21 @@ def manage_procedures(
     """
     Interface for seniors to add Categories and Procedures specific to their team.
     """
-    if not user.team_id:
+    if not user.service_id:
         return RedirectResponse("/equipe", status_code=303)
 
-    # Fetch Global + Team Categories
+    # Fetch Global + Service Categories
     categories = db.query(Category).filter(
         or_(
-            Category.team_id == None,
-            Category.team_id == user.team_id
+            Category.service_id == None,
+            Category.service_id == user.service_id
         )
     ).order_by(Category.name).all()
     
     procedures = db.query(Procedure).filter(
         or_(
-            Procedure.team_id == None,
-            Procedure.team_id == user.team_id
+            Procedure.service_id == None,
+            Procedure.service_id == user.service_id
         )
     ).all()
     
@@ -254,9 +254,9 @@ def manage_procedures(
             grouped_categories["interventions"].append(cat)
 
     # Load existing thresholds for this team
-    from app.models import TeamProcedureThreshold
-    thresholds = db.query(TeamProcedureThreshold).filter(
-        TeamProcedureThreshold.team_id == user.team_id
+    from app.models import ServiceProcedureThreshold
+    thresholds = db.query(ServiceProcedureThreshold).filter(
+        ServiceProcedureThreshold.service_id == user.service_id
     ).all()
     thresholds_by_proc = {
         t.procedure_id: {"min": t.min_procedures, "max": t.max_procedures}
@@ -293,19 +293,19 @@ def add_category(
     user: User = Depends(require_senior),
     db: Session = Depends(get_db),
 ):
-    if not user.team_id:
+    if not user.service_id:
         return RedirectResponse("/equipe", status_code=303)
         
     # Check duplicate in team
     exists = db.query(Category).filter(
         Category.name == name.strip(),
-        Category.team_id == user.team_id
+        Category.service_id == user.service_id
     ).first()
     
     if not exists:
         new_cat = Category(
             name=name.strip(),
-            team_id=user.team_id,
+            service_id=user.service_id,
             section=section
         )
         db.add(new_cat)
@@ -323,20 +323,20 @@ def add_procedure(
     user: User = Depends(require_senior),
     db: Session = Depends(get_db),
 ):
-    if not user.team_id:
+    if not user.service_id:
         return RedirectResponse("/equipe", status_code=303)
         
     # Verify category access
     cat = db.query(Category).get(category_id)
     if not cat:
         return RedirectResponse("/equipe/actes", status_code=303)
-    if cat.team_id and cat.team_id != user.team_id:
+    if cat.service_id and cat.service_id != user.service_id:
         return RedirectResponse("/equipe/actes", status_code=303)
         
     new_proc = Procedure(
         name=name.strip(), 
         category_id=category_id, 
-        team_id=user.team_id,
+        service_id=user.service_id,
         competency_id=competency_id if competency_id else None,
     )
     db.add(new_proc)
@@ -352,7 +352,7 @@ def delete_procedure(
     db: Session = Depends(get_db),
 ):
     proc = db.query(Procedure).get(proc_id)
-    if proc and proc.team_id == user.team_id:
+    if proc and proc.service_id == user.service_id:
         db.delete(proc)
         db.commit()
     # Cannot delete global items
@@ -366,7 +366,7 @@ def delete_category(
     db: Session = Depends(get_db),
 ):
     cat = db.query(Category).get(cat_id)
-    if cat and cat.team_id == user.team_id:
+    if cat and cat.service_id == user.service_id:
         db.delete(cat)
         db.commit()
     return RedirectResponse("/equipe/actes", status_code=303)
@@ -386,21 +386,21 @@ def autonomy_matrix(
     """Autonomy matrix: all residents × all procedures."""
     from app.utils.autonomy import build_autonomy_matrix
     
-    if not user.team_id:
+    if not user.service_id:
         return RedirectResponse("/equipe", status_code=303)
     
     residents = db.query(User).filter(
         User.role == UserRole.resident,
-        User.team_id == user.team_id,
+        User.service_id == user.service_id,
         User.is_approved == True
     ).all()
     
     # Get categories for filter
     categories = db.query(Category).filter(
-        or_(Category.team_id == None, Category.team_id == user.team_id)
+        or_(Category.service_id == None, Category.service_id == user.service_id)
     ).order_by(Category.name).all()
     
-    matrix_data = build_autonomy_matrix(db, user.team_id, residents, categorie)
+    matrix_data = build_autonomy_matrix(db, user.service_id, residents, categorie)
     
     return templates.TemplateResponse(
         "autonomy_matrix.html",
@@ -427,23 +427,23 @@ def comparison_view(
     """Inter-resident comparison for a specific procedure."""
     from app.utils.autonomy import build_comparison_data
     
-    if not user.team_id:
+    if not user.service_id:
         return RedirectResponse("/equipe", status_code=303)
     
     residents = db.query(User).filter(
         User.role == UserRole.resident,
-        User.team_id == user.team_id,
+        User.service_id == user.service_id,
         User.is_approved == True
     ).all()
     
     # Get all procedures for the filter dropdown
     procedures = db.query(Procedure).filter(
-        or_(Procedure.team_id == None, Procedure.team_id == user.team_id)
+        or_(Procedure.service_id == None, Procedure.service_id == user.service_id)
     ).order_by(Procedure.name).all()
     
     comparison = None
     if procedure_id:
-        comparison = build_comparison_data(db, user.team_id, residents, procedure_id)
+        comparison = build_comparison_data(db, user.service_id, residents, procedure_id)
     
     return templates.TemplateResponse(
         "comparison.html",
@@ -471,7 +471,7 @@ def validate_log_success(
     
     # Verify the log belongs to a resident in the senior's team
     resident = db.query(User).get(log.user_id)
-    if not resident or resident.team_id != user.team_id:
+    if not resident or resident.service_id != user.service_id:
         return RedirectResponse("/equipe", status_code=303)
     
     log.is_success = is_success
@@ -491,7 +491,7 @@ def validate_competence(
     from app.models import ProcedureCompetence
     
     resident = db.query(User).get(resident_id)
-    if not resident or resident.team_id != user.team_id:
+    if not resident or resident.service_id != user.service_id:
         return RedirectResponse("/equipe", status_code=303)
     
     comp = db.query(ProcedureCompetence).filter(
@@ -520,7 +520,7 @@ def toggle_pre_mastery(
     from app.models import ProcedureCompetence
     
     resident = db.query(User).get(resident_id)
-    if not resident or resident.team_id != user.team_id:
+    if not resident or resident.service_id != user.service_id:
         return RedirectResponse("/equipe", status_code=303)
     
     comp = db.query(ProcedureCompetence).filter(
@@ -568,26 +568,26 @@ def set_threshold(
     db: Session = Depends(get_db),
 ):
     """Set or update competence threshold for a procedure."""
-    from app.models import TeamProcedureThreshold
+    from app.models import ServiceProcedureThreshold
     
-    if not user.team_id:
+    if not user.service_id:
         return RedirectResponse("/equipe", status_code=303)
     
     # If both fields are empty, redirect with a message
     if min_procedures is None or max_procedures is None:
         return RedirectResponse("/equipe/actes?error=seuil_vide", status_code=303)
     
-    existing = db.query(TeamProcedureThreshold).filter(
-        TeamProcedureThreshold.team_id == user.team_id,
-        TeamProcedureThreshold.procedure_id == procedure_id,
+    existing = db.query(ServiceProcedureThreshold).filter(
+        ServiceProcedureThreshold.service_id == user.service_id,
+        ServiceProcedureThreshold.procedure_id == procedure_id,
     ).first()
     
     if existing:
         existing.min_procedures = min_procedures
         existing.max_procedures = max_procedures
     else:
-        new_threshold = TeamProcedureThreshold(
-            team_id=user.team_id,
+        new_threshold = ServiceProcedureThreshold(
+            service_id=user.service_id,
             procedure_id=procedure_id,
             min_procedures=min_procedures,
             max_procedures=max_procedures,
@@ -599,7 +599,7 @@ def set_threshold(
 
 
 # ---------------------------------------------------------------------------
-# Team Details (MUST be after specific /equipe/... routes)
+# Service Details (MUST be after specific /equipe/... routes)
 # ---------------------------------------------------------------------------
 
 @router.get("/equipe/{resident_id}")
@@ -660,8 +660,8 @@ def resident_detail(
 
     # Acquisition stats + per-procedure mastery for validation buttons
     from app.utils.autonomy import compute_acquisition_stats, compute_procedure_mastery_levels
-    acq_stats = compute_acquisition_stats(db, resident_id, team_id=user.team_id)
-    mastery_levels = compute_procedure_mastery_levels(db, resident_id, team_id=user.team_id)
+    acq_stats = compute_acquisition_stats(db, resident_id, service_id=user.service_id)
+    mastery_levels = compute_procedure_mastery_levels(db, resident_id, service_id=user.service_id)
 
     return templates.TemplateResponse(
         "resident_detail.html",
@@ -740,9 +740,9 @@ def invite_resident(
         return RedirectResponse("/equipe", status_code=303)
         
     base_url = str(request.base_url).rstrip("/")
-    if user.team_id:
-        # Pre-fill team_id and role=resident logic in UI
-        invite_link = f"{base_url}/inscription?team_id={user.team_id}"
+    if user.service_id:
+        # Pre-fill service_id and role=resident logic in UI
+        invite_link = f"{base_url}/inscription?service_id={user.service_id}"
     else:
         invite_link = f"{base_url}/inscription"
         
@@ -759,11 +759,11 @@ def invite_resident(
             # 2. Create Invitation record
             existing_invite = db.query(Invitation).filter(
                 Invitation.email == email,
-                Invitation.team_id == user.team_id
+                Invitation.service_id == user.service_id
             ).first()
             
             if not existing_invite:
-                new_invite = Invitation(email=email, team_id=user.team_id)
+                new_invite = Invitation(email=email, service_id=user.service_id)
                 db.add(new_invite)
             
         body = f"""

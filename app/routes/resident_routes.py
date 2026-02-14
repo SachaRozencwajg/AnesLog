@@ -142,12 +142,12 @@ def dashboard(
         .outerjoin(ProcedureLog, semester_log_filter)
         .filter(
             or_(
-                Category.team_id == None,
-                Category.team_id == user.team_id,
+                Category.service_id == None,
+                Category.service_id == user.service_id,
             ),
             or_(
-                Procedure.team_id == None,
-                Procedure.team_id == user.team_id,
+                Procedure.service_id == None,
+                Procedure.service_id == user.service_id,
             ),
         )
         .group_by(Category.name, Category.section, Procedure.name)
@@ -180,7 +180,7 @@ def dashboard(
 
     # Acquisition stats (global — mastery is career-wide)
     from app.utils.autonomy import compute_acquisition_stats, compute_procedure_mastery_levels
-    acquisition_stats = compute_acquisition_stats(db, user.id, user.team_id, category)
+    acquisition_stats = compute_acquisition_stats(db, user.id, user.service_id, category)
 
     # Recent logs THIS semester (last 5)
     recent_query = (
@@ -194,8 +194,8 @@ def dashboard(
     # Fetch all categories accessible to user
     categories = db.query(Category).filter(
         or_(
-            Category.team_id == None,
-            Category.team_id == user.team_id
+            Category.service_id == None,
+            Category.service_id == user.service_id
         )
     ).order_by(Category.name).all()
 
@@ -212,8 +212,8 @@ def dashboard(
     procedures_by_cat_id = defaultdict(list)
     all_procs = db.query(Procedure).join(Category).filter(
         or_(
-            Procedure.team_id == None,
-            Procedure.team_id == user.team_id
+            Procedure.service_id == None,
+            Procedure.service_id == user.service_id
         )
     ).order_by(Procedure.name).all()
 
@@ -349,7 +349,7 @@ def dashboard(
     # -------------------------------------------------------------------
     # NEW: Learning progression by section (integrated into each card)
     # -------------------------------------------------------------------
-    mastery_levels = compute_procedure_mastery_levels(db, user.id, user.team_id, category)
+    mastery_levels = compute_procedure_mastery_levels(db, user.id, user.service_id, category)
 
     # Group learning procedures by section
     learning_by_section: dict[str, list] = {}
@@ -412,7 +412,7 @@ def dashboard(
             .join(Category)
             .filter(
                 Category.section == "gesture",
-                or_(Procedure.team_id == None, Procedure.team_id == user.team_id),
+                or_(Procedure.service_id == None, Procedure.service_id == user.service_id),
             )
             .all()
         )
@@ -510,8 +510,8 @@ def get_procedures_by_category(
         .filter(Procedure.category_id == category_id)
         .filter(
             or_(
-                Procedure.team_id == None,
-                Procedure.team_id == user.team_id
+                Procedure.service_id == None,
+                Procedure.service_id == user.service_id
             )
         )
         .order_by(Procedure.name)
@@ -564,7 +564,7 @@ async def add_log(
         proc = db.query(Procedure).filter(Procedure.id == pid).first()
         if not proc:
             return None
-        if proc.team_id and proc.team_id != user.team_id:
+        if proc.service_id and proc.service_id != user.service_id:
             return None
         return ProcedureLog(
             user_id=user.id,
@@ -701,7 +701,7 @@ def logbook(
     if section:
         section_cat_ids = db.query(Category.id).filter(
             Category.section == section,
-            or_(Category.team_id == None, Category.team_id == user.team_id),
+            or_(Category.service_id == None, Category.service_id == user.service_id),
         )
         section_proc_ids = db.query(Procedure.id).filter(
             Procedure.category_id.in_(section_cat_ids)
@@ -731,8 +731,8 @@ def logbook(
     # Filter categories by team
     all_categories = db.query(Category).filter(
         or_(
-            Category.team_id == None,
-            Category.team_id == user.team_id
+            Category.service_id == None,
+            Category.service_id == user.service_id
         )
     ).order_by(Category.name).all()
 
@@ -1014,6 +1014,12 @@ def progression(
         ProcedureLog.case_type == CaseType.consultation,
     ).scalar() or 0
 
+    intervention_count = db.query(func.count(func.distinct(ProcedureLog.case_id))).filter(
+        ProcedureLog.user_id == user.id,
+        ProcedureLog.case_id != None,
+        ProcedureLog.case_type == CaseType.intervention,
+    ).scalar() or 0
+
     rea_count = db.query(func.count(func.distinct(ProcedureLog.case_id))).filter(
         ProcedureLog.user_id == user.id,
         ProcedureLog.case_id != None,
@@ -1031,9 +1037,8 @@ def progression(
         "domain_progress": domain_progress,
         "current_semester": current_semester,
         "current_phase": current_phase,
-        "guard_count": guard_count,
-        "total_cases": total_cases,
         "consultation_count": consultation_count,
+        "intervention_count": intervention_count,
         "rea_count": rea_count,
     })
 
@@ -1047,27 +1052,47 @@ def gardes_page(
     request: Request,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    type: str = None,
+    semestre: str = None,
 ):
     """Guard log management page."""
     if user.role == UserRole.senior:
         return RedirectResponse("/equipe", status_code=303)
 
-    guards = db.query(GuardLog).filter(
-        GuardLog.user_id == user.id,
-    ).order_by(GuardLog.date.desc()).all()
+    query = db.query(GuardLog).filter(GuardLog.user_id == user.id)
+
+    # Filter by type
+    if type:
+        query = query.filter(GuardLog.guard_type == type)
+
+    # Filter by semester
+    if semestre == "hors":
+        query = query.filter(GuardLog.semester_id == None)
+    elif semestre:
+        try:
+            query = query.filter(GuardLog.semester_id == int(semestre))
+        except ValueError:
+            pass
+
+    guards = query.order_by(GuardLog.date.desc()).all()
 
     current_semester = db.query(Semester).filter(
         Semester.user_id == user.id,
         Semester.is_current == True,
     ).first()
 
-    # Count per semester
+    # Count per semester (unfiltered)
     semester_count = 0
     if current_semester:
         semester_count = db.query(func.count(GuardLog.id)).filter(
             GuardLog.user_id == user.id,
             GuardLog.semester_id == current_semester.id,
         ).scalar() or 0
+
+    semesters = db.query(Semester).filter(
+        Semester.user_id == user.id,
+        Semester.start_date != None,
+    ).order_by(Semester.number).all()
 
     return templates.TemplateResponse("gardes.html", {
         "request": request,
@@ -1076,6 +1101,9 @@ def gardes_page(
         "current_semester": current_semester,
         "semester_count": semester_count,
         "guard_types": list(GuardType),
+        "semesters": semesters,
+        "selected_type": type,
+        "selected_semester": semestre,
     })
 
 
@@ -1191,7 +1219,7 @@ def _ensure_semester_blocks(db: Session, user: User):
                 end_date=None,
                 hospital=None,
                 service=None,
-                team_id=user.team_id,
+                service_id=user.service_id,
                 is_current=False,
             )
             db.add(sem)
