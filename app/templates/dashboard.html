@@ -293,7 +293,7 @@
     </div>
     {% endif %}
 
-    {# --- INTERVENTIONS card --- #}
+    {# --- INTERVENTIONS card (with integrated donut chart) --- #}
     {% if category_stats_by_section.intervention %}
     {% set ns_inter = namespace(total=0) %}
     {% for cat in category_stats_by_section.intervention %}
@@ -308,47 +308,93 @@
             <span class="text-2xl font-bold text-primary-700">{{ ns_inter.total }} <span
                     class="text-xs font-medium text-gray-400">actes</span></span>
         </div>
-        <div class="space-y-1">
-            {% for cat in category_stats_by_section.intervention %}
-            <div x-data="{ open: false }">
-                <button @click="open = !open"
-                    class="w-full flex items-center gap-3 p-2.5 -mx-0.5 rounded-xl hover:bg-surface-50 transition group cursor-pointer">
-                    <div class="flex-1 min-w-0">
-                        <div class="flex justify-between text-sm mb-1.5">
-                            <span class="text-gray-700 font-medium truncate">{{ cat.name }}</span>
-                            <span class="font-semibold text-gray-800 ml-2 flex-shrink-0">{{ cat.count }}</span>
-                        </div>
-                        <div class="w-full bg-surface-100 rounded-full h-2">
-                            <div class="bg-primary-500 rounded-full h-2 transition-all"
-                                style="width: {{ (cat.count / ns_inter.total * 100)|round|int if ns_inter.total > 0 else 0 }}%">
-                            </div>
-                        </div>
-                    </div>
-                    <svg class="w-4 h-4 text-gray-400 transition-transform flex-shrink-0" :class="open && 'rotate-180'"
-                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                    </svg>
-                </button>
-                <div x-show="open" x-transition:enter="transition ease-out duration-150"
-                    x-transition:enter-start="opacity-0 -translate-y-1"
-                    x-transition:enter-end="opacity-100 translate-y-0" x-cloak
-                    class="ml-4 pl-3 border-l-2 border-primary-100 mb-2">
-                    {% for proc_name, proc_count in cat.procedures %}
-                    <div class="flex justify-between items-center py-1.5 text-xs {{ 'opacity-40' if proc_count == 0 }}">
-                        <span class="{{ 'text-gray-400 italic' if proc_count == 0 else 'text-gray-500' }}">{{ proc_name
-                            }}</span>
-                        {% if proc_count > 0 %}
-                        <span class="font-medium text-gray-700 bg-surface-100 px-2 py-0.5 rounded-full">{{ proc_count
-                            }}</span>
-                        {% else %}
-                        <span class="text-gray-300 px-2 py-0.5">—</span>
-                        {% endif %}
-                    </div>
+
+        {# --- Donut + category list side by side --- #}
+        <div class="flex gap-4 items-start">
+            {# Donut chart (SVG) #}
+            {% if specialty_distribution and specialty_distribution|length > 1 %}
+            <div class="flex-shrink-0 relative" style="width: 90px; height: 90px;">
+                <svg viewBox="0 0 36 36" class="w-full h-full" style="transform: rotate(-90deg)">
+                    {% set ns_donut = namespace(offset=0) %}
+                    {% for spec in specialty_distribution %}
+                    <circle cx="18" cy="18" r="14" fill="none" stroke="{{ spec.color }}" stroke-width="5"
+                        stroke-dasharray="{{ (spec.pct * 87.96) / 100 }} {{ 87.96 - (spec.pct * 87.96) / 100 }}"
+                        stroke-dashoffset="{{ -ns_donut.offset * 87.96 / 100 }}" class="transition-all duration-500">
+                        <title>{{ spec.name }}: {{ spec.count }} ({{ spec.pct }}%)</title>
+                    </circle>
+                    {% set ns_donut.offset = ns_donut.offset + spec.pct %}
                     {% endfor %}
+                </svg>
+                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                    <span class="text-lg font-bold text-gray-800 leading-none">{{ specialty_distribution|length
+                        }}</span>
+                    <span class="text-[8px] text-gray-400 leading-tight">spé.</span>
                 </div>
             </div>
-            {% endfor %}
+            {% endif %}
+
+            {# Category breakdown list #}
+            <div class="flex-1 min-w-0 space-y-1">
+                {% for cat in category_stats_by_section.intervention %}
+                <div x-data="{ open: false }">
+                    <button @click="open = !open"
+                        class="w-full flex items-center gap-3 p-2.5 -mx-0.5 rounded-xl hover:bg-surface-50 transition group cursor-pointer">
+                        {% if specialty_distribution %}
+                        {% set spec_match = specialty_distribution|selectattr('name', 'equalto', cat.name)|first %}
+                        {% if spec_match %}
+                        <span class="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                            style="background-color: {{ spec_match.color }}"></span>
+                        {% endif %}
+                        {% endif %}
+                        <div class="flex-1 min-w-0">
+                            <div class="flex justify-between text-sm mb-1.5">
+                                <span class="text-gray-700 font-medium truncate">{{ cat.name }}</span>
+                                <span class="font-semibold text-gray-800 ml-2 flex-shrink-0">{{ cat.count }}</span>
+                            </div>
+                            <div class="w-full bg-surface-100 rounded-full h-2">
+                                <div class="bg-primary-500 rounded-full h-2 transition-all"
+                                    style="width: {{ (cat.count / ns_inter.total * 100)|round|int if ns_inter.total > 0 else 0 }}%">
+                                </div>
+                            </div>
+                        </div>
+                        <svg class="w-4 h-4 text-gray-400 transition-transform flex-shrink-0"
+                            :class="open && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                    <div x-show="open" x-transition:enter="transition ease-out duration-150"
+                        x-transition:enter-start="opacity-0 -translate-y-1"
+                        x-transition:enter-end="opacity-100 translate-y-0" x-cloak
+                        class="ml-4 pl-3 border-l-2 border-primary-100 mb-2">
+                        {% for proc_name, proc_count in cat.procedures %}
+                        <div
+                            class="flex justify-between items-center py-1.5 text-xs {{ 'opacity-40' if proc_count == 0 }}">
+                            <span class="{{ 'text-gray-400 italic' if proc_count == 0 else 'text-gray-500' }}">{{
+                                proc_name
+                                }}</span>
+                            {% if proc_count > 0 %}
+                            <span class="font-medium text-gray-700 bg-surface-100 px-2 py-0.5 rounded-full">{{
+                                proc_count
+                                }}</span>
+                            {% else %}
+                            <span class="text-gray-300 px-2 py-0.5">—</span>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
         </div>
+
+        {# Concentration insight #}
+        {% if spec_concentrated %}
+        <div class="flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-1.5 mt-3">
+            <span>💡</span>
+            <span>80% de tes interventions sont concentrées en {{
+                specialty_distribution[:2]|map(attribute='name')|join(' et ') }}</span>
+        </div>
+        {% endif %}
     </div>
     {% endif %}
 
@@ -530,52 +576,7 @@
     {% endif %}
     #}
 
-    <!-- ================================================================= -->
-    <!-- Répartition par spécialité (interventions)                         -->
-    <!-- ================================================================= -->
-    {% if specialty_distribution %}
-    <div class="bg-white rounded-2xl p-5 border border-surface-200 mb-4 shadow-sm">
-        <div class="flex items-center justify-between mb-3">
-            <div class="flex items-center gap-2">
-                <span class="text-base">📊</span>
-                <h2 class="text-sm font-semibold text-gray-700">Répartition par spécialité</h2>
-            </div>
-            <span class="text-xs text-gray-400">{{ total_interventions }} intervention{{ 's' if total_interventions > 1
-                }}</span>
-        </div>
-        <!-- Stacked bar -->
-        <div class="flex w-full h-7 rounded-lg overflow-hidden mb-3">
-            {% for spec in specialty_distribution %}
-            <div class="flex items-center justify-center text-white text-[10px] font-semibold transition-all relative group"
-                style="width: {{ spec.pct }}%; background-color: {{ spec.color }}; min-width: {% if spec.pct >= 8 %}0{% else %}18px{% endif %};"
-                title="{{ spec.name }}: {{ spec.count }} ({{ spec.pct }}%)">
-                {% if spec.pct >= 12 %}
-                <span class="truncate px-1">{{ spec.name }} {{ spec.pct }}%</span>
-                {% elif spec.pct >= 6 %}
-                <span class="truncate px-0.5">{{ spec.pct }}%</span>
-                {% endif %}
-            </div>
-            {% endfor %}
-        </div>
-        <!-- Legend -->
-        <div class="flex flex-wrap gap-x-4 gap-y-1 mb-2">
-            {% for spec in specialty_distribution %}
-            <div class="flex items-center gap-1.5 text-xs text-gray-600">
-                <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background-color: {{ spec.color }}"></span>
-                <span class="truncate">{{ spec.name }}</span>
-                <span class="text-gray-400 font-medium">{{ spec.count }}</span>
-            </div>
-            {% endfor %}
-        </div>
-        {% if spec_concentrated %}
-        <div class="flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-1.5 mt-1">
-            <span>💡</span>
-            <span>80% de tes interventions sont concentrées en {{
-                specialty_distribution[:2]|map(attribute='name')|join(' et ') }}</span>
-        </div>
-        {% endif %}
-    </div>
-    {% endif %}
+    {# Répartition par spécialité — now integrated in the Interventions card above #}
 
     <!-- ================================================================= -->
     <!-- Progression par geste (learning procedures, max 3)                 -->
