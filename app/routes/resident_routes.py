@@ -687,6 +687,7 @@ def logbook(
     cat: int | None = Query(None, alias="categorie"),
     autonomy: str | None = Query(None, alias="autonomie"),
     sem: str | None = Query(None, alias="semestre"),
+    section: str | None = Query(None, alias="section"),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -695,6 +696,17 @@ def logbook(
         db.query(ProcedureLog)
         .filter(ProcedureLog.user_id == user.id)
     )
+
+    # Apply section filter (filter by category.section)
+    if section:
+        section_cat_ids = db.query(Category.id).filter(
+            Category.section == section,
+            or_(Category.team_id == None, Category.team_id == user.team_id),
+        )
+        section_proc_ids = db.query(Procedure.id).filter(
+            Procedure.category_id.in_(section_cat_ids)
+        )
+        query = query.filter(ProcedureLog.procedure_id.in_(section_proc_ids))
 
     # Apply category filter
     if cat:
@@ -715,13 +727,22 @@ def logbook(
             pass
 
     logs = query.order_by(ProcedureLog.date.desc()).all()
+
     # Filter categories by team
-    categories = db.query(Category).filter(
+    all_categories = db.query(Category).filter(
         or_(
             Category.team_id == None,
             Category.team_id == user.team_id
         )
     ).order_by(Category.name).all()
+
+    # Group categories by section
+    categories_by_section: dict[str, list] = {}
+    for c in all_categories:
+        categories_by_section.setdefault(c.section, []).append(c)
+
+    # If a section is selected, only show that section's categories
+    visible_categories = [c for c in all_categories if c.section == section] if section else all_categories
 
     # Semesters with dates filled (for filter pills)
     from app.models import Semester
@@ -741,18 +762,29 @@ def logbook(
         ProcedureLog.semester_id == None,
     ).scalar()
 
+    # Section labels for the UI
+    section_labels = {
+        "intervention": "🏥 Interventions",
+        "consultation": "💬 Consultations",
+        "reanimation": "🫀 Réanimation",
+        "gesture": "🩺 Gestes techniques",
+    }
+
     return templates.TemplateResponse(
         "logbook.html",
         {
             "request": request,
             "user": user,
             "logs": logs,
-            "categories": categories,
+            "categories": visible_categories,
+            "categories_by_section": categories_by_section,
             "autonomy_levels": AutonomyLevel,
             "complication_roles": ComplicationRole,
             "selected_category": cat,
             "selected_autonomy": autonomy,
             "selected_semester": sem,
+            "selected_section": section,
+            "section_labels": section_labels,
             "user_semesters": user_semesters,
             "hors_stage_count": hors_stage_count,
             "total_count": total_count,
