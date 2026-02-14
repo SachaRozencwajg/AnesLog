@@ -30,11 +30,32 @@ def profile(
     days_remaining = None
     days_total = None
     days_elapsed = None
+    on_break = False
+    next_semester = None
+    days_until_next = None
+    last_semester = None
+    today = datetime.now(timezone.utc).date()
+
     if current_semester and current_semester.start_date and current_semester.end_date:
-        today = datetime.now(timezone.utc).date()
         days_total = (current_semester.end_date - current_semester.start_date).days
         days_elapsed = max(0, (today - current_semester.start_date).days)
         days_remaining = max(0, (current_semester.end_date - today).days)
+    elif not current_semester:
+        # Check for inter-semester break
+        all_semesters = db.query(Semester).filter(
+            Semester.user_id == user.id,
+        ).order_by(Semester.number).all()
+        completed = [s for s in all_semesters if s.start_date and s.end_date and s.end_date < today]
+        upcoming = [s for s in all_semesters if s.start_date and s.start_date > today]
+        if completed and upcoming:
+            on_break = True
+            last_semester = completed[-1]
+            next_semester = upcoming[0]
+            days_until_next = (next_semester.start_date - today).days
+        elif upcoming:
+            on_break = True
+            next_semester = upcoming[0]
+            days_until_next = (next_semester.start_date - today).days
 
     return templates.TemplateResponse(
         "profile.html",
@@ -46,6 +67,10 @@ def profile(
             "days_remaining": days_remaining,
             "days_total": days_total,
             "days_elapsed": days_elapsed,
+            "on_break": on_break,
+            "next_semester": next_semester,
+            "days_until_next": days_until_next,
+            "last_semester": last_semester,
         },
     )
 
@@ -74,11 +99,31 @@ def update_profile(
     days_remaining = None
     days_total = None
     days_elapsed = None
+    on_break = False
+    next_semester = None
+    days_until_next = None
+    last_semester = None
+    today = datetime.now(timezone.utc).date()
+
     if current_semester and current_semester.start_date and current_semester.end_date:
-        today = datetime.now(timezone.utc).date()
         days_total = (current_semester.end_date - current_semester.start_date).days
         days_elapsed = max(0, (today - current_semester.start_date).days)
         days_remaining = max(0, (current_semester.end_date - today).days)
+    elif not current_semester:
+        all_semesters = db.query(Semester).filter(
+            Semester.user_id == user.id,
+        ).order_by(Semester.number).all()
+        completed = [s for s in all_semesters if s.start_date and s.end_date and s.end_date < today]
+        upcoming = [s for s in all_semesters if s.start_date and s.start_date > today]
+        if completed and upcoming:
+            on_break = True
+            last_semester = completed[-1]
+            next_semester = upcoming[0]
+            days_until_next = (next_semester.start_date - today).days
+        elif upcoming:
+            on_break = True
+            next_semester = upcoming[0]
+            days_until_next = (next_semester.start_date - today).days
 
     return templates.TemplateResponse(
         "profile.html",
@@ -90,5 +135,9 @@ def update_profile(
             "days_remaining": days_remaining,
             "days_total": days_total,
             "days_elapsed": days_elapsed,
+            "on_break": on_break,
+            "next_semester": next_semester,
+            "days_until_next": days_until_next,
+            "last_semester": last_semester,
         },
     )

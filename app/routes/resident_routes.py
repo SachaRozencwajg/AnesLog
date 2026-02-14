@@ -56,6 +56,10 @@ def dashboard(
     days_remaining = None
     days_total = None
     days_elapsed = None
+    on_break = False
+    next_semester = None
+    days_until_next = None
+    last_semester = None
 
     if current_semester and current_semester.start_date:
         query_start = datetime.combine(current_semester.start_date, datetime.min.time()).replace(tzinfo=timezone.utc)
@@ -65,6 +69,25 @@ def dashboard(
             days_elapsed = max(0, (today - current_semester.start_date).days)
             days_remaining = max(0, (current_semester.end_date - today).days)
         semester_label = f"S{current_semester.number}"
+    else:
+        # No current semester — check if the resident is on a break between semesters
+        all_semesters = db.query(Semester).filter(
+            Semester.user_id == user.id,
+        ).order_by(Semester.number).all()
+        completed = [s for s in all_semesters if s.start_date and s.end_date and s.end_date < today]
+        upcoming = [s for s in all_semesters if s.start_date and s.start_date > today]
+        if completed and upcoming:
+            on_break = True
+            last_semester = completed[-1]
+            next_semester = upcoming[0]
+            days_until_next = (next_semester.start_date - today).days
+            # Scope query to the last completed semester for stats display
+            query_start = datetime.combine(last_semester.start_date, datetime.min.time()).replace(tzinfo=timezone.utc)
+            query_end = datetime.combine(last_semester.end_date, datetime.max.time()).replace(tzinfo=timezone.utc)
+        elif upcoming:
+            on_break = True
+            next_semester = upcoming[0]
+            days_until_next = (next_semester.start_date - today).days
 
     # Semester date filter for procedure logs
     sem_date_filter = [
@@ -316,6 +339,10 @@ def dashboard(
             "days_remaining": days_remaining,
             "days_total": days_total,
             "days_elapsed": days_elapsed,
+            "on_break": on_break,
+            "next_semester": next_semester,
+            "days_until_next": days_until_next,
+            "last_semester": last_semester,
         },
     )
 
@@ -512,6 +539,7 @@ def logbook(
     request: Request,
     cat: int | None = Query(None, alias="categorie"),
     autonomy: str | None = Query(None, alias="autonomie"),
+    sem: str | None = Query(None, alias="semestre"),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -530,6 +558,15 @@ def logbook(
     if autonomy:
         query = query.filter(ProcedureLog.autonomy_level == autonomy)
 
+    # Apply semester filter
+    if sem == "hors":
+        query = query.filter(ProcedureLog.semester_id == None)
+    elif sem:
+        try:
+            query = query.filter(ProcedureLog.semester_id == int(sem))
+        except ValueError:
+            pass
+
     logs = query.order_by(ProcedureLog.date.desc()).all()
     # Filter categories by team
     categories = db.query(Category).filter(
@@ -539,9 +576,22 @@ def logbook(
         )
     ).order_by(Category.name).all()
 
+    # Semesters with dates filled (for filter pills)
+    from app.models import Semester
+    user_semesters = db.query(Semester).filter(
+        Semester.user_id == user.id,
+        Semester.start_date != None,
+    ).order_by(Semester.number).all()
+
     # Count total (unfiltered) for display
     total_count = db.query(func.count(ProcedureLog.id)).filter(
         ProcedureLog.user_id == user.id
+    ).scalar()
+
+    # Check if there are any "hors stage" logs
+    hors_stage_count = db.query(func.count(ProcedureLog.id)).filter(
+        ProcedureLog.user_id == user.id,
+        ProcedureLog.semester_id == None,
     ).scalar()
 
     return templates.TemplateResponse(
@@ -555,6 +605,9 @@ def logbook(
             "complication_roles": ComplicationRole,
             "selected_category": cat,
             "selected_autonomy": autonomy,
+            "selected_semester": sem,
+            "user_semesters": user_semesters,
+            "hors_stage_count": hors_stage_count,
             "total_count": total_count,
         },
     )
@@ -989,14 +1042,26 @@ def _ensure_semester_blocks(db: Session, user: User):
             break
 
     if not current_found:
-        # Mark the latest filled semester as current
-        filled = [s for s in all_semesters if s.start_date]
-        if filled:
-            filled[-1].is_current = True
-            user.semester = filled[-1].number
+        # Today is NOT inside any semester — could be a gap (pause) or no data.
+        # Only fall back to a semester whose end_date is in the past (completed).
+        # Do NOT mark a future semester as current.
+        completed = [s for s in all_semesters if s.start_date and s.end_date and s.end_date < today]
+        if completed:
+            # Keep the user's semester number at the last completed one,
+            # but do NOT set is_current — this signals "pause" to the frontend.
+            user.semester = completed[-1].number
         else:
-            # No semesters have dates — clear stale semester number
-            user.semester = None
+            # Check if there is a future semester (not yet started)
+            future = [s for s in all_semesters if s.start_date and s.start_date > today]
+            if future:
+                # Resident has upcoming semesters but none completed yet
+                user.semester = future[0].number
+            else:
+                filled = [s for s in all_semesters if s.start_date]
+                if filled:
+                    user.semester = filled[-1].number
+                else:
+                    user.semester = None
 
     db.commit()
     return all_semesters

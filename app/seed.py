@@ -308,6 +308,30 @@ SEED_DATA: dict[str, list[str]] = {
     ]
 }
 
+# ---------------------------------------------------------------------------
+# LC-CUSUM thresholds per gesture (literature-based)
+# p0 = unacceptable failure rate (null hypothesis in Wald test)
+# p1 = acceptable failure rate (alternative hypothesis)
+# Convention: p0 = 2 × p1 (standard in the literature)
+# Sources: Konrad et al. Anesth Analg 2003, Frontiers in Medicine (US-CEB),
+#          NIH meta-analyses on PNB, DLT, CVC, arterial line success rates
+# ---------------------------------------------------------------------------
+LC_CUSUM_THRESHOLDS: dict[str, tuple[float, float]] = {
+    # Simple / intermediate gestures: p0=0.20, p1=0.10
+    "KTA (Cathéter artériel)": (0.20, 0.10),
+    "KTC (Cathéter veineux central)": (0.20, 0.10),
+    "Péridurale thoracique": (0.20, 0.10),           # Konrad: 10% acceptable
+    "ALR para-sternale": (0.20, 0.10),
+    "ALR périphérique (TAP block)": (0.20, 0.10),
+    "ALR périphérique (Sciatique poplité)": (0.20, 0.10),
+    "ALR périphérique (Fémoral)": (0.20, 0.10),
+    # Complex gestures: p0=0.30, p1=0.15
+    "Swan-Ganz (Cathéter artériel pulmonaire)": (0.30, 0.15),
+    "Intubation double lumière": (0.30, 0.15),       # DLT malpositioning 33-50%
+    "Bloqueur bronchique": (0.30, 0.15),
+    "ETO peropératoire": (0.30, 0.15),               # Complex imaging
+}
+
 # Demo users — each resident at a specific DESAR semester for comprehensive testing
 DEMO_USERS = [
     # ─── Residents at different DESAR phases ───
@@ -574,9 +598,10 @@ def seed_guard_logs(db):
         sem_number = user.semester or 2
         num_guards = sem_number * 3 + random.randint(0, 5)  # S2→6-11, S10→30-35
         
-        # Get all semesters for this user to distribute guards
+        # Get semesters with dates for this user to distribute guards
         semesters = db.query(Semester).filter(
-            Semester.user_id == user.id
+            Semester.user_id == user.id,
+            Semester.start_date.isnot(None),
         ).order_by(Semester.number).all()
         
         for i in range(num_guards):
@@ -686,9 +711,10 @@ def generate_fake_cases(db, user, cases_target):
     autonomy_levels = list(AutonomyLevel)
     weights = AUTONOMY_WEIGHTS.get(sem_number, AUTONOMY_WEIGHTS[5])
     
-    # Get ALL semesters for distributing cases across time
+    # Get only semesters with dates (past/current) for distributing cases across time
     semesters = db.query(Semester).filter(
-        Semester.user_id == user.id
+        Semester.user_id == user.id,
+        Semester.start_date.isnot(None),
     ).order_by(Semester.number).all()
     
     semester_map = {s.number: s for s in semesters}
@@ -892,8 +918,15 @@ def seed():
                     .first()
                 )
                 if not exists:
-                    db.add(Procedure(name=proc_name, category_id=cat.id))
-                    print(f"    + {proc_name}")
+                    p0, p1 = LC_CUSUM_THRESHOLDS.get(proc_name, (None, None))
+                    db.add(Procedure(
+                        name=proc_name,
+                        category_id=cat.id,
+                        lc_cusum_p0=p0,
+                        lc_cusum_p1=p1,
+                    ))
+                    threshold_info = f" (p0={p0}, p1={p1})" if p0 else ""
+                    print(f"    + {proc_name}{threshold_info}")
 
         db.commit()
         

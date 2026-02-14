@@ -5,8 +5,8 @@
 <div class="max-w-2xl mx-auto px-4 py-6 pb-24"
     x-data="{ showModal: false, today: new Date().toISOString().split('T')[0] }">
 
-    <!-- Incomplete Profile Banner -->
-    {% if user.role.value == 'resident' and not current_semester %}
+    <!-- Incomplete Profile Banner (only if truly no semesters configured) -->
+    {% if user.role.value == 'resident' and not current_semester and not on_break %}
     <div
         class="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
         <div class="flex items-center gap-3">
@@ -26,6 +26,99 @@
             class="w-full sm:w-auto text-center px-4 py-2 bg-white text-yellow-700 text-xs font-semibold rounded-lg border border-yellow-200 hover:bg-yellow-50 transition-colors whitespace-nowrap shadow-sm">
             Gérer mes semestres
         </a>
+    </div>
+    {% endif %}
+
+    <!-- ================================================================= -->
+    <!-- Inter-semester Break Card                                          -->
+    <!-- ================================================================= -->
+    {% if on_break %}
+    <div class="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl border border-amber-200 p-5 mb-6 shadow-sm">
+        <div class="flex items-start gap-3 mb-4">
+            <div class="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+                <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </div>
+            <div class="flex-1">
+                <h1 class="text-lg font-bold text-amber-900">Intersemestre</h1>
+                <p class="text-sm text-amber-700 mt-0.5">
+                    Vous êtes actuellement entre deux stages.
+                    {% if last_semester %}
+                    Votre S{{ last_semester.number }} s'est terminé le {{ last_semester.end_date.strftime('%d/%m/%Y')
+                    }}.
+                    {% endif %}
+                </p>
+            </div>
+            <a href="/semestres"
+                class="text-xs text-amber-600 font-medium hover:text-amber-700 flex items-center gap-1 mt-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                Modifier
+            </a>
+        </div>
+
+        {% if next_semester %}
+        <!-- Next semester details -->
+        <div class="bg-white/70 backdrop-blur rounded-xl p-4 border border-amber-100">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold
+                    {% if next_semester.phase.value == 'socle' %}bg-blue-100 text-blue-700
+                    {% elif next_semester.phase.value == 'approfondissement' %}bg-amber-100 text-amber-700
+                    {% else %}bg-emerald-100 text-emerald-700{% endif %}">
+                    S{{ next_semester.number }}
+                </div>
+                <div class="flex-1">
+                    <p class="text-sm font-semibold text-gray-800">
+                        Prochain stage : Phase {{ next_semester.phase.value | capitalize }}
+                    </p>
+                    <p class="text-xs text-gray-500">
+                        {% if next_semester.hospital %}{{ next_semester.hospital }}{% endif %}
+                        {% if next_semester.service %} · {{ next_semester.service }}{% endif %}
+                    </p>
+                </div>
+            </div>
+
+            <!-- Countdown -->
+            <div class="flex items-center justify-between">
+                <div class="flex flex-wrap gap-x-5 gap-y-2 text-xs text-gray-500">
+                    {% if next_semester.start_date %}
+                    <span class="flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        Début le {{ next_semester.start_date.strftime('%d/%m/%Y') }}
+                    </span>
+                    {% endif %}
+                    {% if next_semester.subdivision %}
+                    <span class="flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        {{ next_semester.subdivision }}
+                    </span>
+                    {% endif %}
+                </div>
+                {% if days_until_next is not none %}
+                <span
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-100 text-amber-700 rounded-full text-xs font-bold">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    J-{{ days_until_next }}
+                </span>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
     </div>
     {% endif %}
 
@@ -122,11 +215,11 @@
     {% endif %}
 
     <!-- ================================================================= -->
-    <!-- Point 1 : Interventions / Gestes / Complications — 3 cartes        -->
+    <!-- Point 1 : Consultations / Interventions / Réa / Gestes              -->
     <!-- ================================================================= -->
 
-    {% set has_any = category_stats_by_section.intervention or category_stats_by_section.gesture or
-    category_stats_by_section.complication %}
+    {% set has_any = category_stats_by_section.consultation or category_stats_by_section.intervention or
+    category_stats_by_section.reanimation or category_stats_by_section.gesture %}
 
     {% if not has_any %}
     <div class="bg-white rounded-2xl border border-surface-200 p-5 mb-6 shadow-sm text-center">
@@ -138,6 +231,65 @@
         </div>
         <p class="text-sm text-gray-500">Aucun acte enregistré ce semestre.</p>
         <p class="text-xs text-gray-400 mt-1">Appuyez sur le bouton <strong>+</strong> pour commencer !</p>
+    </div>
+    {% endif %}
+
+    {# --- CONSULTATIONS card --- #}
+    {% if category_stats_by_section.consultation %}
+    {% set ns_consult = namespace(total=0) %}
+    {% for cat in category_stats_by_section.consultation %}
+    {% set ns_consult.total = ns_consult.total + cat.count %}
+    {% endfor %}
+    <div class="bg-white rounded-2xl border border-surface-200 p-5 mb-4 shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-2">
+                <span class="text-base">📋</span>
+                <h2 class="text-sm font-semibold text-indigo-700">Consultations d'anesthésie</h2>
+            </div>
+            <span class="text-2xl font-bold text-indigo-700">{{ ns_consult.total }} <span
+                    class="text-xs font-medium text-gray-400">cas</span></span>
+        </div>
+        <div class="space-y-1">
+            {% for cat in category_stats_by_section.consultation %}
+            <div x-data="{ open: false }">
+                <button @click="open = !open"
+                    class="w-full flex items-center gap-3 p-2.5 -mx-0.5 rounded-xl hover:bg-surface-50 transition group cursor-pointer">
+                    <div class="flex-1 min-w-0">
+                        <div class="flex justify-between text-sm mb-1.5">
+                            <span class="text-gray-700 font-medium truncate">{{ cat.name }}</span>
+                            <span class="font-semibold text-gray-800 ml-2 flex-shrink-0">{{ cat.count }}</span>
+                        </div>
+                        <div class="w-full bg-surface-100 rounded-full h-2">
+                            <div class="bg-indigo-400 rounded-full h-2 transition-all"
+                                style="width: {{ (cat.count / ns_consult.total * 100)|round|int if ns_consult.total > 0 else 0 }}%">
+                            </div>
+                        </div>
+                    </div>
+                    <svg class="w-4 h-4 text-gray-400 transition-transform flex-shrink-0" :class="open && 'rotate-180'"
+                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </button>
+                <div x-show="open" x-transition:enter="transition ease-out duration-150"
+                    x-transition:enter-start="opacity-0 -translate-y-1"
+                    x-transition:enter-end="opacity-100 translate-y-0" x-cloak
+                    class="ml-4 pl-3 border-l-2 border-indigo-100 mb-2">
+                    {% for proc_name, proc_count in cat.procedures %}
+                    <div class="flex justify-between items-center py-1.5 text-xs {{ 'opacity-40' if proc_count == 0 }}">
+                        <span class="{{ 'text-gray-400 italic' if proc_count == 0 else 'text-gray-500' }}">{{ proc_name
+                            }}</span>
+                        {% if proc_count > 0 %}
+                        <span class="font-medium text-gray-700 bg-surface-100 px-2 py-0.5 rounded-full">{{ proc_count
+                            }}</span>
+                        {% else %}
+                        <span class="text-gray-300 px-2 py-0.5">—</span>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
     </div>
     {% endif %}
 
@@ -159,7 +311,6 @@
         <div class="space-y-1">
             {% for cat in category_stats_by_section.intervention %}
             <div x-data="{ open: false }">
-                <!-- Category row (clickable) -->
                 <button @click="open = !open"
                     class="w-full flex items-center gap-3 p-2.5 -mx-0.5 rounded-xl hover:bg-surface-50 transition group cursor-pointer">
                     <div class="flex-1 min-w-0">
@@ -178,11 +329,69 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                     </svg>
                 </button>
-                <!-- Procedure detail dropdown -->
                 <div x-show="open" x-transition:enter="transition ease-out duration-150"
                     x-transition:enter-start="opacity-0 -translate-y-1"
                     x-transition:enter-end="opacity-100 translate-y-0" x-cloak
                     class="ml-4 pl-3 border-l-2 border-primary-100 mb-2">
+                    {% for proc_name, proc_count in cat.procedures %}
+                    <div class="flex justify-between items-center py-1.5 text-xs {{ 'opacity-40' if proc_count == 0 }}">
+                        <span class="{{ 'text-gray-400 italic' if proc_count == 0 else 'text-gray-500' }}">{{ proc_name
+                            }}</span>
+                        {% if proc_count > 0 %}
+                        <span class="font-medium text-gray-700 bg-surface-100 px-2 py-0.5 rounded-full">{{ proc_count
+                            }}</span>
+                        {% else %}
+                        <span class="text-gray-300 px-2 py-0.5">—</span>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {# --- REANIMATION card --- #}
+    {% if category_stats_by_section.reanimation %}
+    {% set ns_rea = namespace(total=0) %}
+    {% for cat in category_stats_by_section.reanimation %}
+    {% set ns_rea.total = ns_rea.total + cat.count %}
+    {% endfor %}
+    <div class="bg-white rounded-2xl border border-surface-200 p-5 mb-4 shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-2">
+                <span class="text-base">🫁</span>
+                <h2 class="text-sm font-semibold text-amber-700">Cas de réanimation</h2>
+            </div>
+            <span class="text-2xl font-bold text-amber-700">{{ ns_rea.total }} <span
+                    class="text-xs font-medium text-gray-400">cas</span></span>
+        </div>
+        <div class="space-y-1">
+            {% for cat in category_stats_by_section.reanimation %}
+            <div x-data="{ open: false }">
+                <button @click="open = !open"
+                    class="w-full flex items-center gap-3 p-2.5 -mx-0.5 rounded-xl hover:bg-surface-50 transition group cursor-pointer">
+                    <div class="flex-1 min-w-0">
+                        <div class="flex justify-between text-sm mb-1.5">
+                            <span class="text-gray-700 font-medium truncate">{{ cat.name }}</span>
+                            <span class="font-semibold text-gray-800 ml-2 flex-shrink-0">{{ cat.count }}</span>
+                        </div>
+                        <div class="w-full bg-surface-100 rounded-full h-2">
+                            <div class="bg-amber-400 rounded-full h-2 transition-all"
+                                style="width: {{ (cat.count / ns_rea.total * 100)|round|int if ns_rea.total > 0 else 0 }}%">
+                            </div>
+                        </div>
+                    </div>
+                    <svg class="w-4 h-4 text-gray-400 transition-transform flex-shrink-0" :class="open && 'rotate-180'"
+                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </button>
+                <div x-show="open" x-transition:enter="transition ease-out duration-150"
+                    x-transition:enter-start="opacity-0 -translate-y-1"
+                    x-transition:enter-end="opacity-100 translate-y-0" x-cloak
+                    class="ml-4 pl-3 border-l-2 border-amber-100 mb-2">
                     {% for proc_name, proc_count in cat.procedures %}
                     <div class="flex justify-between items-center py-1.5 text-xs {{ 'opacity-40' if proc_count == 0 }}">
                         <span class="{{ 'text-gray-400 italic' if proc_count == 0 else 'text-gray-500' }}">{{ proc_name
@@ -261,7 +470,7 @@
     </div>
     {% endif %}
 
-    {# --- COMPLICATIONS card --- #}
+    {# --- COMPLICATIONS card (masqué pour l'instant) ---
     {% if category_stats_by_section.complication %}
     {% set ns_compl = namespace(total=0) %}
     {% for cat in category_stats_by_section.complication %}
@@ -319,6 +528,7 @@
         </div>
     </div>
     {% endif %}
+    #}
 
     <!-- ================================================================= -->
     <!-- Recent Activity (semester-scoped)                                  -->
@@ -349,7 +559,18 @@
                 <div class="flex-1 min-w-0">
                     <p class="text-sm font-medium text-gray-800 truncate">{{ log.procedure.name }}</p>
                     <p class="text-xs text-gray-400">{{ log.date.strftime('%d/%m/%Y') }} · {{
-                        log.procedure.category.name }}</p>
+                        log.procedure.category.name }}
+                        {% if not log.semester_id %}
+                        · <span
+                            class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-500">Hors
+                            stage</span>
+                        {% elif log.semester %}
+                        · <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold
+                            {% if log.semester.phase.value == 'socle' %}bg-blue-50 text-blue-600
+                            {% elif log.semester.phase.value == 'approfondissement' %}bg-amber-50 text-amber-600
+                            {% else %}bg-emerald-50 text-emerald-600{% endif %}">S{{ log.semester.number }}</span>
+                        {% endif %}
+                    </p>
                 </div>
                 <span class="text-xs px-2 py-1 rounded-full
                     {% if log.autonomy_level == 'Autonome' %}badge-autonomous
@@ -443,7 +664,7 @@
                     </div>
                     <div>
                         <h3 class="font-bold text-gray-900">Intervention au bloc</h3>
-                        <p class="text-xs text-gray-500 mt-0.5">Intervention principale + gestes + complications</p>
+                        <p class="text-xs text-gray-500 mt-0.5">Intervention principale + gestes techniques</p>
                     </div>
                 </button>
 
@@ -705,7 +926,7 @@
                         {% endfor %}
                     </div>
 
-                    <!-- 3. COMPLICATIONS -->
+                    {# --- 3. COMPLICATIONS (masqué pour l'instant) ---
                     <div>
                         <h3 class="flex items-center gap-2 text-sm font-bold text-red-900 mb-4">
                             <span
@@ -745,6 +966,7 @@
                         {% endif %}
                         {% endfor %}
                     </div>
+                    #}
 
                     <!-- Submit Button -->
                     <div class="sticky bottom-0 pt-4 bg-white/95 backdrop-blur border-t border-gray-100 mt-8 pb-2">

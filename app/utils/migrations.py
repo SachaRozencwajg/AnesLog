@@ -320,6 +320,8 @@ def run_postgres_migrations():
                 ("procedure_logs", "semester_id", "INTEGER REFERENCES semesters(id)"),
                 ("procedure_logs", "case_type", "VARCHAR(20) DEFAULT 'intervention' NOT NULL"),
                 ("procedures", "competency_id", "INTEGER REFERENCES competencies(id)"),
+                ("procedures", "lc_cusum_p0", "DOUBLE PRECISION"),
+                ("procedures", "lc_cusum_p1", "DOUBLE PRECISION"),
                 ("semesters", "subdivision", "VARCHAR(100)"),
                 ("semesters", "chef_de_service", "VARCHAR(255)"),
             ]
@@ -332,6 +334,33 @@ def run_postgres_migrations():
                     print(f"Migration: Adding '{col}' to {tbl}.")
                     conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN {col} {defn};"))
                     conn.commit()
+
+            # ----------------------------------------------------------
+            # Populate LC-CUSUM thresholds from literature
+            # (only sets NULL values — doesn't override manual adjustments)
+            # ----------------------------------------------------------
+            _LC_CUSUM_DEFAULTS = {
+                # Simple gestures: p0=0.20, p1=0.10
+                "KTA (Cathéter artériel)": (0.20, 0.10),
+                "KTC (Cathéter veineux central)": (0.20, 0.10),
+                "Péridurale thoracique": (0.20, 0.10),
+                "ALR para-sternale": (0.20, 0.10),
+                "ALR périphérique (TAP block)": (0.20, 0.10),
+                "ALR périphérique (Sciatique poplité)": (0.20, 0.10),
+                "ALR périphérique (Fémoral)": (0.20, 0.10),
+                # Complex gestures: p0=0.30, p1=0.15
+                "Swan-Ganz (Cathéter artériel pulmonaire)": (0.30, 0.15),
+                "Intubation double lumière": (0.30, 0.15),
+                "Bloqueur bronchique": (0.30, 0.15),
+                "ETO peropératoire": (0.30, 0.15),
+            }
+            for proc_name, (p0_val, p1_val) in _LC_CUSUM_DEFAULTS.items():
+                conn.execute(text(
+                    "UPDATE procedures SET lc_cusum_p0 = :p0, lc_cusum_p1 = :p1 "
+                    "WHERE name = :name AND lc_cusum_p0 IS NULL;"
+                ), {"p0": p0_val, "p1": p1_val, "name": proc_name})
+            conn.commit()
+            print("Migration: LC-CUSUM thresholds populated.")
 
             # ----------------------------------------------------------
             # Fix start_date NOT NULL constraint (semesters start empty)

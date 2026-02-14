@@ -251,7 +251,7 @@
         </div>
     </div>
 
-    <!-- 3. Complications -->
+    {# --- 3. Complications (masqué pour l'instant) ---
     <div class="mb-12">
         <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
             <span
@@ -260,7 +260,6 @@
         </h2>
         <p class="text-gray-500 mb-4 text-sm">Liste des complications possibles à déclarer.</p>
 
-        <!-- Create Complication Category -->
         <div class="bg-white p-6 rounded-2xl border border-surface-200 shadow-sm mb-6">
             <h3 class="text-base font-semibold text-gray-900 mb-4">Ajouter une catégorie de complications (ex: Choc,
                 Respiratoire)</h3>
@@ -283,64 +282,66 @@
             <p class="text-gray-500 italic">Aucune catégorie de complications configurée.</p>
             {% endfor %}
         </div>
-        <!-- 4. Autonomy Thresholds -->
-        <div class="mb-12">
-            <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
-                <span
-                    class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center text-sm font-bold">4</span>
-                Seuils d'autonomie
-            </h2>
-            <p class="text-gray-500 mb-4 text-sm">Définissez le nombre attendu de procédures avant qu'un interne puisse
-                déclarer son autonomie. Ces seuils servent à détecter les internes trop confiants ou sous-confiants.</p>
+    </div>
+    #}
+    <!-- 4. Autonomy Thresholds -->
+    <div class="mb-12">
+        <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+            <span
+                class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center text-sm font-bold">4</span>
+            Seuils d'autonomie
+        </h2>
+        <p class="text-gray-500 mb-4 text-sm">Définissez le nombre attendu de procédures avant qu'un interne puisse
+            déclarer son autonomie. Ces seuils servent à détecter les internes trop confiants ou sous-confiants.</p>
 
-            {% if request.query_params.get('error') == 'seuil_vide' %}
-            <div
-                class="mb-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-700 flex items-center gap-2">
-                ⚠️ Veuillez renseigner les valeurs min et max avant de définir un seuil.
-            </div>
-            {% endif %}
+        {% if request.query_params.get('error') == 'seuil_vide' %}
+        <div
+            class="mb-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-700 flex items-center gap-2">
+            ⚠️ Veuillez renseigner les valeurs min et max avant de définir un seuil.
+        </div>
+        {% endif %}
 
-            <div class="bg-white rounded-2xl border border-surface-200 shadow-sm overflow-hidden">
-                <div class="divide-y divide-surface-100">
-                    {% for section_name, section_cats in [('interventions', grouped_categories.interventions),
-                    ('gestures', grouped_categories.gestures), ('complications', grouped_categories.complications)] %}
-                    {% for cat in section_cats %}
-                    {% for item in items_by_cat[cat.id] %}
-                    <form action="/equipe/seuils" method="post"
-                        class="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-4 hover:bg-surface-50 transition"
-                        @submit="saveScroll()">
-                        <input type="hidden" name="procedure_id" value="{{ item.id }}">
-                        <div class="flex-1 min-w-0">
-                            <p class="text-sm font-medium text-gray-800 truncate">{{ item.name }}</p>
-                            <p class="text-xs text-gray-400">{{ cat.name }}</p>
+        <div class="bg-white rounded-2xl border border-surface-200 shadow-sm overflow-hidden">
+            <div class="divide-y divide-surface-100">
+                {% for section_name, section_cats in [('interventions', grouped_categories.interventions),
+                ('gestures', grouped_categories.gestures)] %}
+                {% for cat in section_cats %}
+                {% for item in items_by_cat[cat.id] %}
+                <form action="/equipe/seuils" method="post"
+                    class="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-4 hover:bg-surface-50 transition"
+                    @submit="saveScroll()">
+                    <input type="hidden" name="procedure_id" value="{{ item.id }}">
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-gray-800 truncate">{{ item.name }}</p>
+                        <p class="text-xs text-gray-400">{{ cat.name }}</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-1.5">
+                            <label class="text-xs text-gray-500 whitespace-nowrap">Min</label>
+                            <input type="number" name="min_procedures" min="1" max="100"
+                                value="{{ thresholds_by_proc.get(item.id, {}).get('min', '') }}" placeholder="5"
+                                class="w-16 px-2 py-1.5 text-sm text-center rounded-lg border border-surface-300 focus:outline-none focus:ring-2 focus:ring-primary-500">
                         </div>
-                        <div class="flex items-center gap-2">
-                            <div class="flex items-center gap-1.5">
-                                <label class="text-xs text-gray-500 whitespace-nowrap">Min</label>
-                                <input type="number" name="min_procedures" min="1" max="100"
-                                    value="{{ thresholds_by_proc.get(item.id, {}).get('min', '') }}" placeholder="5"
-                                    class="w-16 px-2 py-1.5 text-sm text-center rounded-lg border border-surface-300 focus:outline-none focus:ring-2 focus:ring-primary-500">
-                            </div>
-                            <span class="text-gray-300">—</span>
-                            <div class="flex items-center gap-1.5">
-                                <label class="text-xs text-gray-500 whitespace-nowrap">Max</label>
-                                <input type="number" name="max_procedures" min="1" max="100"
-                                    value="{{ thresholds_by_proc.get(item.id, {}).get('max', '') }}" placeholder="15"
-                                    class="w-16 px-2 py-1.5 text-sm text-center rounded-lg border border-surface-300 focus:outline-none focus:ring-2 focus:ring-primary-500">
-                            </div>
-                            <button type="submit"
-                                class="ml-2 px-3 py-1.5 text-xs font-medium rounded-lg transition
+                        <span class="text-gray-300">—</span>
+                        <div class="flex items-center gap-1.5">
+                            <label class="text-xs text-gray-500 whitespace-nowrap">Max</label>
+                            <input type="number" name="max_procedures" min="1" max="100"
+                                value="{{ thresholds_by_proc.get(item.id, {}).get('max', '') }}" placeholder="15"
+                                class="w-16 px-2 py-1.5 text-sm text-center rounded-lg border border-surface-300 focus:outline-none focus:ring-2 focus:ring-primary-500">
+                        </div>
+                        <button type="submit"
+                            class="ml-2 px-3 py-1.5 text-xs font-medium rounded-lg transition
                                 {% if thresholds_by_proc.get(item.id) %}bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100{% else %}bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200{% endif %}">
-                                {% if thresholds_by_proc.get(item.id) %}✓ Défini{% else %}Définir{% endif %}
-                            </button>
-                        </div>
-                    </form>
-                    {% endfor %}
-                    {% endfor %}
-                    {% endfor %}
-                </div>
+                            {% if thresholds_by_proc.get(item.id) %}✓ Défini{% else %}Définir{% endif %}
+                        </button>
+                    </div>
+                </form>
+                {% endfor %}
+                {% endfor %}
+                {% endfor %}
             </div>
         </div>
-
     </div>
-    {% endblock %}
+
+</div>
+{% endblock %}

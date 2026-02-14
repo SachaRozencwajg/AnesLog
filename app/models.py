@@ -15,7 +15,7 @@ import enum
 from datetime import datetime, timezone
 
 from sqlalchemy import (
-    Column, Integer, String, Text, DateTime, ForeignKey, Enum as SAEnum, Boolean, Date
+    Column, Integer, String, Text, DateTime, ForeignKey, Enum as SAEnum, Boolean, Date, Float
 )
 from sqlalchemy.orm import relationship
 
@@ -224,6 +224,13 @@ class Procedure(Base):
     # DESAR competency domain tagging (optional — set by senior)
     competency_id = Column(Integer, ForeignKey("competencies.id"), nullable=True)
     competency = relationship("Competency")
+
+    # LC-CUSUM thresholds (per-procedure, literature-based)
+    # p0 = unacceptable failure rate (null hypothesis in Wald test)
+    # p1 = acceptable failure rate (alternative hypothesis)
+    # Convention: p0 = 2 * p1 (literature standard)
+    lc_cusum_p0 = Column(Float, nullable=True)  # e.g. 0.20
+    lc_cusum_p1 = Column(Float, nullable=True)  # e.g. 0.10
 
     # Relationships
     category = relationship("Category", back_populates="procedures")

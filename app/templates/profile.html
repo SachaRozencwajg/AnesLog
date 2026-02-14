@@ -94,6 +94,15 @@
                 {% else %}bg-emerald-100 text-emerald-700{% endif %}">
                 S{{ current_semester.number }} · Phase {{ current_semester.phase.value | capitalize }}
             </span>
+            {% elif on_break %}
+            <span
+                class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Intersemestre
+            </span>
             {% endif %}
         </div>
 
@@ -135,6 +144,58 @@
                         <div class="bg-primary-500 h-1.5 rounded-full transition-all"
                             style="width: {{ ((days_elapsed / days_total) * 100) | int if days_total else 0 }}%"></div>
                     </div>
+                </div>
+                {% endif %}
+            </div>
+            {% elif on_break %}
+            <!-- Inter-semester break summary -->
+            <div class="mb-5 p-4 bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-xl">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
+                        <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-sm font-semibold text-amber-900">Intersemestre</p>
+                        <p class="text-xs text-amber-700">
+                            {% if last_semester %}
+                            S{{ last_semester.number }} terminé le {{ last_semester.end_date.strftime('%d/%m/%Y') }}
+                            {% else %}
+                            Vous êtes entre deux stages
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+                {% if next_semester %}
+                <div class="flex items-center justify-between bg-white/60 rounded-lg p-3 border border-amber-100">
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded flex items-center justify-center text-xs font-bold
+                            {% if next_semester.phase.value == 'socle' %}bg-blue-100 text-blue-700
+                            {% elif next_semester.phase.value == 'approfondissement' %}bg-amber-100 text-amber-700
+                            {% else %}bg-emerald-100 text-emerald-700{% endif %}">
+                            S{{ next_semester.number }}
+                        </div>
+                        <div>
+                            <p class="text-xs font-semibold text-gray-800">
+                                {% if next_semester.hospital %}{{ next_semester.hospital }}{% endif %}
+                                {% if next_semester.service %} · {{ next_semester.service }}{% endif %}
+                                {% if not next_semester.hospital and not next_semester.service %}Prochain stage{% endif
+                                %}
+                            </p>
+                            {% if next_semester.start_date %}
+                            <p class="text-xs text-gray-500">Début le {{ next_semester.start_date.strftime('%d/%m/%Y')
+                                }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% if days_until_next is not none %}
+                    <span
+                        class="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-bold">
+                        J-{{ days_until_next }}
+                    </span>
+                    {% endif %}
                 </div>
                 {% endif %}
             </div>

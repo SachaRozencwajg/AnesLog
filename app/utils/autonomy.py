@@ -540,8 +540,13 @@ def build_comparison_data(
         elif threshold and not is_mastered and log_count > threshold["max"] * 2:
             alert_type = "under_confidence"
         
-        # Compute LC-CUSUM
-        lc_cusum = compute_lc_cusum(logs) if logs else None
+        # Compute LC-CUSUM (use per-procedure thresholds)
+        if logs:
+            p0 = procedure.lc_cusum_p0 if procedure.lc_cusum_p0 else 0.30
+            p1 = procedure.lc_cusum_p1 if procedure.lc_cusum_p1 else 0.10
+            lc_cusum = compute_lc_cusum(logs, p0=p0, p1=p1)
+        else:
+            lc_cusum = None
         
         resident_data.append({
             "user": resident,

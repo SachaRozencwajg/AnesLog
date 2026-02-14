@@ -174,6 +174,11 @@
                                 tentative{{ 's' if item.lc_cusum.total_attempts > 1 else '' }}
                                 · {{ item.lc_cusum.data_points|selectattr('success')|list|length }} ✅
                                 {{ item.lc_cusum.data_points|rejectattr('success')|list|length }} ❌</p>
+                            <p class="text-xs text-gray-300 mt-0.5"
+                                title="Seuil acceptable / inacceptable (test de Wald)">
+                                Seuil : p₁={{ (item.p1 * 100)|int }}% acceptable · p₀={{ (item.p0 * 100)|int }}%
+                                inacceptable
+                            </p>
                         </div>
                         {% if item.lc_cusum.competence_reached %}
                         <span

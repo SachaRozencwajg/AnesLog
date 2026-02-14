@@ -707,13 +707,18 @@ def _compute_resident_lc_cusum(db: Session, resident_id: int) -> list[dict]:
     for proc_id, proc_logs in by_procedure.items():
         if len(proc_logs) < 1:  # Show all gestures that have any logs
             continue
-        cusum = compute_lc_cusum(proc_logs)
         proc = proc_logs[0].procedure
+        # Use per-procedure thresholds if available, else defaults
+        p0 = proc.lc_cusum_p0 if proc.lc_cusum_p0 else 0.30
+        p1 = proc.lc_cusum_p1 if proc.lc_cusum_p1 else 0.10
+        cusum = compute_lc_cusum(proc_logs, p0=p0, p1=p1)
         results.append({
             "procedure_id": proc.id,
             "procedure_name": proc.name,
             "category_name": proc.category.name if proc.category else "",
             "lc_cusum": cusum,
+            "p0": p0,
+            "p1": p1,
         })
     
     # Sort by category name, then procedure name
