@@ -648,8 +648,9 @@
     {% endif %}
 
     <!-- ================================================================= -->
-    <!-- Zones blanches (after 30% semester elapsed)                        -->
+    <!-- Zones blanches (after 30% semester elapsed) — HIDDEN FOR NOW       -->
     <!-- ================================================================= -->
+    {#
     {% if blind_spots and semester_progress_pct >= 30 %}
     <div class="bg-white rounded-2xl p-5 border border-surface-200 mb-4 shadow-sm">
         <div class="flex items-center justify-between mb-3">
@@ -683,6 +684,7 @@
         </div>
     </div>
     {% endif %}
+    #}
 
     <!-- ================================================================= -->
     <!-- Recent Activity (semester-scoped)                                  -->
