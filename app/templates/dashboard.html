@@ -290,6 +290,61 @@
             </div>
             {% endfor %}
         </div>
+
+        {# --- Learning accordion for consultation --- #}
+        {% if learning_by_section.get('consultation') %}
+        <div x-data="{ showLearning: false }" class="mt-3 pt-3 border-t border-surface-100">
+            <button @click="showLearning = !showLearning"
+                class="w-full flex items-center justify-between py-1 cursor-pointer group">
+                <div class="flex items-center gap-1.5">
+                    <span class="text-xs">📈</span>
+                    <span class="text-xs font-medium text-gray-500 group-hover:text-gray-700 transition">En
+                        apprentissage</span>
+                    <span class="text-[10px] text-gray-400 bg-surface-100 px-1.5 py-0.5 rounded-full">{{
+                        learning_by_section['consultation']|length }}</span>
+                </div>
+                <svg class="w-3.5 h-3.5 text-gray-400 transition-transform" :class="showLearning && 'rotate-180'"
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+            </button>
+            <div x-show="showLearning" x-transition x-cloak class="mt-2 space-y-2">
+                {% for item in learning_by_section['consultation'] %}
+                <div class="bg-surface-50 rounded-lg p-2.5">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <span class="text-xs font-medium text-gray-700 truncate">{{ item.name }}</span>
+                        <span
+                            class="text-[10px] text-gray-400 bg-white px-1.5 py-0.5 rounded-full flex-shrink-0 ml-2">{{
+                            item.log_count }} acte{{ 's' if item.log_count > 1 }}</span>
+                    </div>
+                    <div class="flex items-center gap-1 overflow-x-auto pb-0.5">
+                        {% for point in item.timeline %}
+                        {% set dot_color = {'Observé': 'bg-amber-300', 'Assisté': 'bg-blue-300', 'Supervisé':
+                        'bg-teal-400', 'Autonome': 'bg-green-500'} %}
+                        <div class="flex flex-col items-center gap-0.5 flex-shrink-0"
+                            title="{{ point.level }} — {{ point.date }}">
+                            <div class="w-3 h-3 rounded-full {{ dot_color.get(point.level, 'bg-gray-300') }}"></div>
+                            <span class="text-[7px] text-gray-400">{{ point.date }}</span>
+                        </div>
+                        {% if not loop.last %}<div class="w-1.5 h-px bg-surface-200 flex-shrink-0 mt-[-6px]"></div>{%
+                        endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+                <div class="flex gap-3 pt-1">
+                    <span class="flex items-center gap-1 text-[8px] text-gray-400"><span
+                            class="w-1.5 h-1.5 rounded-full bg-amber-300"></span>Obs</span>
+                    <span class="flex items-center gap-1 text-[8px] text-gray-400"><span
+                            class="w-1.5 h-1.5 rounded-full bg-blue-300"></span>Ass</span>
+                    <span class="flex items-center gap-1 text-[8px] text-gray-400"><span
+                            class="w-1.5 h-1.5 rounded-full bg-teal-400"></span>Sup</span>
+                    <span class="flex items-center gap-1 text-[8px] text-gray-400"><span
+                            class="w-1.5 h-1.5 rounded-full bg-green-500"></span>Aut</span>
+                </div>
+            </div>
+        </div>
+        {% endif %}
     </div>
     {% endif %}
 
@@ -387,6 +442,61 @@
             </div>
         </div>
 
+        {# --- Learning accordion for intervention --- #}
+        {% if learning_by_section.get('intervention') %}
+        <div x-data="{ showLearning: false }" class="mt-3 pt-3 border-t border-surface-100">
+            <button @click="showLearning = !showLearning"
+                class="w-full flex items-center justify-between py-1 cursor-pointer group">
+                <div class="flex items-center gap-1.5">
+                    <span class="text-xs">📈</span>
+                    <span class="text-xs font-medium text-gray-500 group-hover:text-gray-700 transition">En
+                        apprentissage</span>
+                    <span class="text-[10px] text-gray-400 bg-surface-100 px-1.5 py-0.5 rounded-full">{{
+                        learning_by_section['intervention']|length }}</span>
+                </div>
+                <svg class="w-3.5 h-3.5 text-gray-400 transition-transform" :class="showLearning && 'rotate-180'"
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+            </button>
+            <div x-show="showLearning" x-transition x-cloak class="mt-2 space-y-2">
+                {% for item in learning_by_section['intervention'] %}
+                <div class="bg-surface-50 rounded-lg p-2.5">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <span class="text-xs font-medium text-gray-700 truncate">{{ item.name }}</span>
+                        <span
+                            class="text-[10px] text-gray-400 bg-white px-1.5 py-0.5 rounded-full flex-shrink-0 ml-2">{{
+                            item.log_count }} acte{{ 's' if item.log_count > 1 }}</span>
+                    </div>
+                    <div class="flex items-center gap-1 overflow-x-auto pb-0.5">
+                        {% for point in item.timeline %}
+                        {% set dot_color = {'Observé': 'bg-amber-300', 'Assisté': 'bg-blue-300', 'Supervisé':
+                        'bg-teal-400', 'Autonome': 'bg-green-500'} %}
+                        <div class="flex flex-col items-center gap-0.5 flex-shrink-0"
+                            title="{{ point.level }} — {{ point.date }}">
+                            <div class="w-3 h-3 rounded-full {{ dot_color.get(point.level, 'bg-gray-300') }}"></div>
+                            <span class="text-[7px] text-gray-400">{{ point.date }}</span>
+                        </div>
+                        {% if not loop.last %}<div class="w-1.5 h-px bg-surface-200 flex-shrink-0 mt-[-6px]"></div>{%
+                        endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+                <div class="flex gap-3 pt-1">
+                    <span class="flex items-center gap-1 text-[8px] text-gray-400"><span
+                            class="w-1.5 h-1.5 rounded-full bg-amber-300"></span>Obs</span>
+                    <span class="flex items-center gap-1 text-[8px] text-gray-400"><span
+                            class="w-1.5 h-1.5 rounded-full bg-blue-300"></span>Ass</span>
+                    <span class="flex items-center gap-1 text-[8px] text-gray-400"><span
+                            class="w-1.5 h-1.5 rounded-full bg-teal-400"></span>Sup</span>
+                    <span class="flex items-center gap-1 text-[8px] text-gray-400"><span
+                            class="w-1.5 h-1.5 rounded-full bg-green-500"></span>Aut</span>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
         {# Concentration insight #}
         {% if spec_concentrated %}
         <div class="flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-1.5 mt-3">
@@ -454,6 +564,61 @@
             </div>
             {% endfor %}
         </div>
+
+        {# --- Learning accordion for reanimation --- #}
+        {% if learning_by_section.get('reanimation') %}
+        <div x-data="{ showLearning: false }" class="mt-3 pt-3 border-t border-surface-100">
+            <button @click="showLearning = !showLearning"
+                class="w-full flex items-center justify-between py-1 cursor-pointer group">
+                <div class="flex items-center gap-1.5">
+                    <span class="text-xs">📈</span>
+                    <span class="text-xs font-medium text-gray-500 group-hover:text-gray-700 transition">En
+                        apprentissage</span>
+                    <span class="text-[10px] text-gray-400 bg-surface-100 px-1.5 py-0.5 rounded-full">{{
+                        learning_by_section['reanimation']|length }}</span>
+                </div>
+                <svg class="w-3.5 h-3.5 text-gray-400 transition-transform" :class="showLearning && 'rotate-180'"
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+            </button>
+            <div x-show="showLearning" x-transition x-cloak class="mt-2 space-y-2">
+                {% for item in learning_by_section['reanimation'] %}
+                <div class="bg-surface-50 rounded-lg p-2.5">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <span class="text-xs font-medium text-gray-700 truncate">{{ item.name }}</span>
+                        <span
+                            class="text-[10px] text-gray-400 bg-white px-1.5 py-0.5 rounded-full flex-shrink-0 ml-2">{{
+                            item.log_count }} acte{{ 's' if item.log_count > 1 }}</span>
+                    </div>
+                    <div class="flex items-center gap-1 overflow-x-auto pb-0.5">
+                        {% for point in item.timeline %}
+                        {% set dot_color = {'Observé': 'bg-amber-300', 'Assisté': 'bg-blue-300', 'Supervisé':
+                        'bg-teal-400', 'Autonome': 'bg-green-500'} %}
+                        <div class="flex flex-col items-center gap-0.5 flex-shrink-0"
+                            title="{{ point.level }} — {{ point.date }}">
+                            <div class="w-3 h-3 rounded-full {{ dot_color.get(point.level, 'bg-gray-300') }}"></div>
+                            <span class="text-[7px] text-gray-400">{{ point.date }}</span>
+                        </div>
+                        {% if not loop.last %}<div class="w-1.5 h-px bg-surface-200 flex-shrink-0 mt-[-6px]"></div>{%
+                        endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+                <div class="flex gap-3 pt-1">
+                    <span class="flex items-center gap-1 text-[8px] text-gray-400"><span
+                            class="w-1.5 h-1.5 rounded-full bg-amber-300"></span>Obs</span>
+                    <span class="flex items-center gap-1 text-[8px] text-gray-400"><span
+                            class="w-1.5 h-1.5 rounded-full bg-blue-300"></span>Ass</span>
+                    <span class="flex items-center gap-1 text-[8px] text-gray-400"><span
+                            class="w-1.5 h-1.5 rounded-full bg-teal-400"></span>Sup</span>
+                    <span class="flex items-center gap-1 text-[8px] text-gray-400"><span
+                            class="w-1.5 h-1.5 rounded-full bg-green-500"></span>Aut</span>
+                </div>
+            </div>
+        </div>
+        {% endif %}
     </div>
     {% endif %}
 
@@ -513,6 +678,61 @@
             </div>
             {% endfor %}
         </div>
+
+        {# --- Learning accordion for gesture --- #}
+        {% if learning_by_section.get('gesture') %}
+        <div x-data="{ showLearning: false }" class="mt-3 pt-3 border-t border-surface-100">
+            <button @click="showLearning = !showLearning"
+                class="w-full flex items-center justify-between py-1 cursor-pointer group">
+                <div class="flex items-center gap-1.5">
+                    <span class="text-xs">📈</span>
+                    <span class="text-xs font-medium text-gray-500 group-hover:text-gray-700 transition">En
+                        apprentissage</span>
+                    <span class="text-[10px] text-gray-400 bg-surface-100 px-1.5 py-0.5 rounded-full">{{
+                        learning_by_section['gesture']|length }}</span>
+                </div>
+                <svg class="w-3.5 h-3.5 text-gray-400 transition-transform" :class="showLearning && 'rotate-180'"
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+            </button>
+            <div x-show="showLearning" x-transition x-cloak class="mt-2 space-y-2">
+                {% for item in learning_by_section['gesture'] %}
+                <div class="bg-surface-50 rounded-lg p-2.5">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <span class="text-xs font-medium text-gray-700 truncate">{{ item.name }}</span>
+                        <span
+                            class="text-[10px] text-gray-400 bg-white px-1.5 py-0.5 rounded-full flex-shrink-0 ml-2">{{
+                            item.log_count }} acte{{ 's' if item.log_count > 1 }}</span>
+                    </div>
+                    <div class="flex items-center gap-1 overflow-x-auto pb-0.5">
+                        {% for point in item.timeline %}
+                        {% set dot_color = {'Observé': 'bg-amber-300', 'Assisté': 'bg-blue-300', 'Supervisé':
+                        'bg-teal-400', 'Autonome': 'bg-green-500'} %}
+                        <div class="flex flex-col items-center gap-0.5 flex-shrink-0"
+                            title="{{ point.level }} — {{ point.date }}">
+                            <div class="w-3 h-3 rounded-full {{ dot_color.get(point.level, 'bg-gray-300') }}"></div>
+                            <span class="text-[7px] text-gray-400">{{ point.date }}</span>
+                        </div>
+                        {% if not loop.last %}<div class="w-1.5 h-px bg-surface-200 flex-shrink-0 mt-[-6px]"></div>{%
+                        endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+                <div class="flex gap-3 pt-1">
+                    <span class="flex items-center gap-1 text-[8px] text-gray-400"><span
+                            class="w-1.5 h-1.5 rounded-full bg-amber-300"></span>Obs</span>
+                    <span class="flex items-center gap-1 text-[8px] text-gray-400"><span
+                            class="w-1.5 h-1.5 rounded-full bg-blue-300"></span>Ass</span>
+                    <span class="flex items-center gap-1 text-[8px] text-gray-400"><span
+                            class="w-1.5 h-1.5 rounded-full bg-teal-400"></span>Sup</span>
+                    <span class="flex items-center gap-1 text-[8px] text-gray-400"><span
+                            class="w-1.5 h-1.5 rounded-full bg-green-500"></span>Aut</span>
+                </div>
+            </div>
+        </div>
+        {% endif %}
     </div>
     {% endif %}
 
@@ -578,75 +798,7 @@
 
     {# Répartition par spécialité — now integrated in the Interventions card above #}
 
-    <!-- ================================================================= -->
-    <!-- Progression par geste (learning procedures, max 3)                 -->
-    <!-- ================================================================= -->
-    {% if gesture_progression %}
-    <div class="bg-white rounded-2xl p-5 border border-surface-200 mb-4 shadow-sm">
-        <div class="flex items-center justify-between mb-4">
-            <div class="flex items-center gap-2">
-                <span class="text-base">📈</span>
-                <h2 class="text-sm font-semibold text-gray-700">Progression par geste</h2>
-            </div>
-            <a href="/mon-desar" class="text-xs text-primary-600 font-medium hover:text-primary-700">Voir tout →</a>
-        </div>
-        <div class="space-y-4">
-            {% for geste in gesture_progression %}
-            <div class="border border-surface-100 rounded-xl p-3">
-                <div class="flex items-center justify-between mb-2">
-                    <div class="min-w-0">
-                        <span class="text-sm font-medium text-gray-800 truncate block">{{ geste.name }}</span>
-                        <span class="text-[10px] text-gray-400">{{ geste.category }}</span>
-                    </div>
-                    <span
-                        class="text-xs font-semibold text-gray-500 bg-surface-100 px-2 py-0.5 rounded-full flex-shrink-0 ml-2">
-                        {{ geste.log_count }} acte{{ 's' if geste.log_count > 1 }}
-                    </span>
-                </div>
-                <!-- Timeline dots -->
-                <div class="flex items-center gap-1.5 overflow-x-auto pb-1">
-                    {% for point in geste.timeline %}
-                    {% set dot_color = {
-                    'Observé': 'bg-amber-300',
-                    'Assisté': 'bg-blue-300',
-                    'Supervisé': 'bg-teal-400',
-                    'Autonome': 'bg-green-500'
-                    } %}
-                    <div class="flex flex-col items-center gap-0.5 flex-shrink-0"
-                        title="{{ point.level }} — {{ point.date }}">
-                        <div
-                            class="w-4 h-4 rounded-full {{ dot_color.get(point.level, 'bg-gray-300') }} flex items-center justify-center">
-                            {% if point.level == 'Autonome' %}
-                            <svg class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd"
-                                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                    clip-rule="evenodd" />
-                            </svg>
-                            {% endif %}
-                        </div>
-                        <span class="text-[8px] text-gray-400 leading-none">{{ point.date }}</span>
-                    </div>
-                    {% if not loop.last %}
-                    <div class="w-2 h-px bg-surface-200 flex-shrink-0 mt-[-8px]"></div>
-                    {% endif %}
-                    {% endfor %}
-                </div>
-                <!-- Legend inline -->
-                <div class="flex gap-3 mt-2 pt-2 border-t border-surface-100">
-                    <span class="flex items-center gap-1 text-[9px] text-gray-400"><span
-                            class="w-2 h-2 rounded-full bg-amber-300"></span>Obs</span>
-                    <span class="flex items-center gap-1 text-[9px] text-gray-400"><span
-                            class="w-2 h-2 rounded-full bg-blue-300"></span>Ass</span>
-                    <span class="flex items-center gap-1 text-[9px] text-gray-400"><span
-                            class="w-2 h-2 rounded-full bg-teal-400"></span>Sup</span>
-                    <span class="flex items-center gap-1 text-[9px] text-gray-400"><span
-                            class="w-2 h-2 rounded-full bg-green-500"></span>Aut</span>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-    </div>
-    {% endif %}
+    {# Progression par geste — now integrated into each section card above #}
 
     <!-- ================================================================= -->
     <!-- Zones blanches (after 30% semester elapsed) — HIDDEN FOR NOW       -->

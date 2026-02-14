@@ -34,10 +34,16 @@ def compute_procedure_mastery_levels(
     user_id: int,
     team_id: int | None = None,
     category_id: int | None = None,
+    section: str | None = None,
 ) -> dict[int, dict]:
     """
     For every procedure accessible to the user, compute the current
     acquisition level based on their log history and competence records.
+
+    Args:
+        section: Optional section filter ('intervention', 'gesture',
+                 'consultation', 'reanimation'). If None, all sections
+                 except 'complication' are included.
 
     Returns: {
         procedure_id: {
@@ -64,8 +70,11 @@ def compute_procedure_mastery_levels(
         proc_q = proc_q.filter(or_(Procedure.team_id == None, Procedure.team_id == team_id))
     else:
         proc_q = proc_q.filter(Procedure.team_id == None)
-    # Only interventions (section = 'intervention')
-    proc_q = proc_q.filter(Category.section == "intervention")
+    # Section filter
+    if section:
+        proc_q = proc_q.filter(Category.section == section)
+    else:
+        proc_q = proc_q.filter(Category.section != "complication")
     procedures = proc_q.order_by(Category.name, Procedure.name).all()
 
     # 2. Competence records

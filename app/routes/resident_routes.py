@@ -347,11 +347,12 @@ def dashboard(
         spec_concentrated = top2_pct >= 80
 
     # -------------------------------------------------------------------
-    # NEW: Gesture progression (learning procedures only, max 3)
+    # NEW: Learning progression by section (integrated into each card)
     # -------------------------------------------------------------------
     mastery_levels = compute_procedure_mastery_levels(db, user.id, user.team_id, category)
-    gesture_progression = []
-    # Filter to learning procedures only (has logs but not mastered/locked)
+
+    # Group learning procedures by section
+    learning_by_section: dict[str, list] = {}
     learning_procs = [
         info for info in mastery_levels.values()
         if info["level"] == "learning" and not info["is_complication"]
@@ -359,8 +360,13 @@ def dashboard(
     # Sort by log count descending (most advanced first)
     learning_procs.sort(key=lambda x: -x["log_count"])
 
-    for info in learning_procs[:3]:
+    for info in learning_procs:
         proc = info["procedure"]
+        sec = proc.category.section if proc.category else "intervention"
+        if sec not in learning_by_section:
+            learning_by_section[sec] = []
+        if len(learning_by_section[sec]) >= 3:
+            continue  # max 3 per section
         # Get chronological logs for this procedure to build timeline
         proc_logs = (
             db.query(ProcedureLog.autonomy_level, ProcedureLog.date)
@@ -377,7 +383,7 @@ def dashboard(
                 "level": log_level or "Observé",
                 "date": log_date.strftime("%d/%m") if log_date else "",
             })
-        gesture_progression.append({
+        learning_by_section[sec].append({
             "name": proc.name,
             "category": proc.category.name if proc.category else "",
             "log_count": info["log_count"],
@@ -480,7 +486,7 @@ def dashboard(
             "specialty_distribution": specialty_distribution,
             "total_interventions": total_interventions,
             "spec_concentrated": spec_concentrated,
-            "gesture_progression": gesture_progression,
+            "learning_by_section": learning_by_section,
             "blind_spots": blind_spots,
             "blind_spots_total": blind_spots_total_available,
             "semester_progress_pct": semester_progress_pct,
